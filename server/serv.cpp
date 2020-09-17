@@ -38,11 +38,12 @@ int main(int argc, char ** argv){
 		} else {
 
                     std::cout << "Connection Established" << std::endl;
+
                 }
 
 
 		// Recieve information
-		directUser(cliFD); 
+		//directUser(cliFD); 
 	}
 
 
@@ -108,17 +109,17 @@ int getSock(std::string port){
 
 	return sockfd;
 }
-
+/*
 void directUser(int cliFD){
 
-	char buf [BUFSIZ] ;
-        int recieved; 
+	void *buf;
+        int received; 
 
 	while(true) {
 		
-		recieved = recv(cliFD, buf, sizeof(buf), 0);
-                if(revieved > 0) {
-                    
+		received = recv(cliFD, buf, sizeof(buf), 0);
+                if(received > 0) {
+                    //parseCommands(buf);
                 } else {
                     std::cerr << "Server failed on recv(): " << std::endl;
                 }
@@ -126,6 +127,36 @@ void directUser(int cliFD){
 	}
 
 }
+
+void parseCommands(void *command) {
+    std::string command = (std::string)*command;
+    void 
+
+    if(command.compare("DN")) {
+        
+    } else if(command.compare("DN")) {
+
+    } else if(command.compare("DN")) {
+
+    } else if(command.compare("DN")) {
+
+    } else if(command.compare("DN")) {
+
+    } else if(command.compare("DN")) {
+
+    }else if(command.compare("DN")) {
+
+    }else if(command.compare("DN")) {
+
+    }else if(command.compare("DN")) {
+
+    } else {
+
+        std::cerr << "Command not recognized: " << std::endl;
+
+    }
+} */
+    
 
 	
 	
