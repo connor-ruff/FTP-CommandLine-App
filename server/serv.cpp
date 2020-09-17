@@ -15,6 +15,7 @@
 
 char * parseArgs(int, char **);
 int getSock(std::string);
+void directUser(int);
 
 int main(int argc, char ** argv){
 
@@ -28,16 +29,17 @@ int main(int argc, char ** argv){
 
 	// Accept a Connection
 	int cliFD;
-	struct sock_addr_in cliAddr;
+	struct sockaddr_in cliAddr;
 	int addr_len = sizeof(cliAddr);
 	while (true){
-		if ( cliFD = accept(sockfd, (struct sockaddr *)&cliAddr, &addr_len) < 0){
-			std::cerr << "Error on Accepting Client Connection" << std:endl;
+		if ( cliFD = accept(sockfd, (struct sockaddr *)&cliAddr, (socklen_t *) &addr_len) < 0){
+			std::cerr << "Error on Accepting Client Connection" << std::endl;
 			std::exit(-1);
 		}
 
 
-		// Recieve information 
+		// Recieve information
+		directUser(cliFD); 
 	}
 
 
@@ -101,8 +103,19 @@ int getSock(std::string port){
 		std::exit(-1);
 	}
 
-
 	return sockfd;
+}
+
+void directUser(int cliFD){
+
+	char buf [BUFSIZ] ;
+
+	while(true) {
+		
+		recv(cliFD, buf, sizeof(buf), 0)
+
+	}
+
 }
 
 	
