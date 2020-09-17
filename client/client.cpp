@@ -8,6 +8,9 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
+#include <iostream>
+
+
 char* PROGRAM_NAME;
 
 void usage(int arg){
@@ -15,11 +18,11 @@ void usage(int arg){
 	exit(arg);
 }
 
-FILE* get_socket(){
-	FILE * fd;
-	if ((fd = socket(AF_INET, SOCK_STREAM, 0) < 0) {
+int get_socket(){
+	int fd;
+	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		std::cerr << "Could not create socket\n";
-	   	return NULL;	
+	   	return -1;	
 	}	
 	return fd;
 
@@ -36,15 +39,15 @@ int main(int argc, char* argv[]){
 	char* serverName = argv[1];
 	int port = atoi(argv[2]);
 	
-	FILE *fd = get_socket();
-	if (!fd){
-		cout << "Creating file descriptor failed\n");
+	int fd = get_socket();
+	if (fd < 0){
+		std::cout << "Creating file descriptor failed\n";
 		exit(EXIT_FAILURE);
 	}
 
 	memset((char*)&servaddr, 0, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
-	servaddr.sin_port htons(port);
+	servaddr.sin_port = htons(port);
 
 	// Get host name
 	hp = gethostbyname(serverName);
@@ -55,9 +58,9 @@ int main(int argc, char* argv[]){
 	memcpy((void *)&servaddr.sin_addr, hp->h_addr_list[0], hp->h_length);
 
 	// send a test message
-	char* testmsg = "THIS IS A TEST";
-	if(sendto(fd, testmsg, strlen(msg), 0, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
-		cout << " test failed\n";
+	char testmsg[] = "THIS IS A TEST";
+	if(sendto(fd, testmsg, strlen(testmsg), 0, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+		std::cout << " test failed\n";
 	}
 	
 }
