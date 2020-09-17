@@ -35,7 +35,10 @@ int main(int argc, char ** argv){
 		if ( cliFD = accept(sockfd, (struct sockaddr *)&cliAddr, (socklen_t *) &addr_len) < 0){
 			std::cerr << "Error on Accepting Client Connection" << std::endl;
 			std::exit(-1);
-		}
+		} else {
+
+                    std::cout << "Connection Established" << std::endl;
+                }
 
 
 		// Recieve information
@@ -109,10 +112,16 @@ int getSock(std::string port){
 void directUser(int cliFD){
 
 	char buf [BUFSIZ] ;
+        int recieved; 
 
 	while(true) {
 		
-		recv(cliFD, buf, sizeof(buf), 0)
+		recieved = recv(cliFD, buf, sizeof(buf), 0);
+                if(revieved > 0) {
+                    
+                } else {
+                    std::cerr << "Server failed on recv(): " << std::endl;
+                }
 
 	}
 
