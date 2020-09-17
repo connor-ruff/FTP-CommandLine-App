@@ -16,7 +16,7 @@
 char * parseArgs(int, char **);
 int getSock(std::string);
 void directUser(int);
-
+void parseCommands(void *);
 int main(int argc, char ** argv){
 
 	// Get CL Arg
@@ -43,7 +43,7 @@ int main(int argc, char ** argv){
 
 
 		// Recieve information
-		//directUser(cliFD); 
+		directUser(cliFD); 
 	}
 
 
@@ -109,53 +109,75 @@ int getSock(std::string port){
 
 	return sockfd;
 }
-/*
+
 void directUser(int cliFD){
 
-	void *buf;
+	char buf[BUFSIZ];
         int received; 
+
+        std::cout << cliFD << std::endl;
 
 	while(true) {
 		
-		received = recv(cliFD, buf, sizeof(buf), 0);
-                if(received > 0) {
-                    //parseCommands(buf);
+		received = recv(cliFD, buf, BUFSIZ, 0);
+                if(received != -1) {
+                    std::cout << "IN" << std::endl;
+                    parseCommands((void *)buf);
                 } else {
-                    std::cerr << "Server failed on recv(): " << std::endl;
+                    //std::cerr << "Server failed on recv(): " << std::endl;
+
                 }
 
 	}
 
 }
 
-void parseCommands(void *command) {
-    std::string command = (std::string)*command;
-    void 
+void parseCommands(void *com) {
+    char *command = (char *)com;
 
-    if(command.compare("DN")) {
+    if(strcmp(command,"DN")) {
+
+        std::cout << "download" << std::endl;
         
-    } else if(command.compare("DN")) {
+    } else if(strcmp(command, "UP")) {
 
-    } else if(command.compare("DN")) {
+        std::cout << "upload" << std::endl;
 
-    } else if(command.compare("DN")) {
+    } else if(strcmp(command, "HEAD")) {
 
-    } else if(command.compare("DN")) {
+        std::cout << "head" << std::endl;
 
-    } else if(command.compare("DN")) {
+    } else if(strcmp(command, "RM")) {
 
-    }else if(command.compare("DN")) {
+        std::cout << "rm" << std::endl;
 
-    }else if(command.compare("DN")) {
+    } else if(strcmp(command, "LS")) {
 
-    }else if(command.compare("DN")) {
+        std::cout << "ls" << std::endl;
+
+    } else if(strcmp(command, "MKDIR")) {
+
+        std::cout << "mkdir" << std::endl;
+
+    }else if(strcmp(command, "RMDIR")) {
+
+        std::cout << "rmdir" << std::endl;
+
+    }else if(strcmp(command, "CD")) {
+
+        std::cout << "cd" << std::endl;
+
+
+    }else if(strcmp(command, "QUIT")) {
+
+        std::cout << "quit" << std::endl;
 
     } else {
 
         std::cerr << "Command not recognized: " << std::endl;
 
     }
-} */
+} 
     
 
 	
