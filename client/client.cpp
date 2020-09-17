@@ -57,10 +57,17 @@ int main(int argc, char* argv[]){
 	// put hosts address into server address structure
 	memcpy((void *)&servaddr.sin_addr, hp->h_addr_list[0], hp->h_length);
 
+
+	// connect
+	if (connect(fd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0){
+		printf("\nConnection Failed \n");
+		return -1;
+	}
+	
 	// send a test message
 	char testmsg[] = "THIS IS A TEST";
-	if(sendto(fd, testmsg, strlen(testmsg), 0, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
-		std::cout << " test failed\n";
-	}
+	std::cout << "test message\n";
+
+	send(fd, testmsg, strlen(testmsg), 0);
 	
 }
