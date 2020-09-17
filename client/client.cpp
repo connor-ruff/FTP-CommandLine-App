@@ -3,15 +3,25 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <netdb.h>
+#include <unistd.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 
 #include <iostream>
+#include <string>
 
 
 char* PROGRAM_NAME;
+
+std::string get_user_input(){
+	std::cout << "> ";
+	std::string command;
+	getline(std::cin, command);
+	return command;
+}
+
 
 void usage(int arg){
 	std::cout << PROGRAM_NAME << "[PORT] [File/Text\n";
@@ -64,10 +74,12 @@ int main(int argc, char* argv[]){
 		return -1;
 	}
 	
-	// send a test message
-	char testmsg[] = "THIS IS A TEST";
-	std::cout << "test message\n";
 
-	send(fd, testmsg, strlen(testmsg), 0);
+	// Prompt the user for input and handle it
+	while(true){
+		std::string user_input = get_user_input();
+		send(fd, user_input.c_str(), strlen(user_input.c_str()), 0);
+	}
+	close(fd);
 	
 }
