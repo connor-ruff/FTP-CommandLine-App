@@ -1,6 +1,7 @@
 
 #include<string>
 #include<iostream>
+#include<dirent.h>
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -17,6 +18,8 @@ char * parseArgs(int, char **);
 int getSock(std::string);
 void directUser(int);
 void parseCommands(void *);
+void listing();
+
 int main(int argc, char ** argv){
 
 	// Get CL Arg
@@ -112,25 +115,42 @@ int getSock(std::string port){
 
 void directUser(int cliFD){
 
-	char buf[BUFSIZ];
+    char buf[BUFSIZ];
     int received; 
+	
+    received = recv(cliFD, buf, BUFSIZ, 0);
 
-    std::cout << cliFD << std::endl;
-			
-	received = recv(cliFD, buf, BUFSIZ, 0);
     if(received != -1) {
          parseCommands((void *)buf);
     } else {
-		 std::cerr << "Server failed on recv(): " << std::endl;
+	std::cerr << "Server failed on recv(): " << std::endl;
     }
 }
 
 void parseCommands(void *com) {
-    char *command = (char *)com;
+    char *totalCommand = (char *)com;
+
+    char *command = strtok(totalCommand, " ");
+    char *len = strtok(NULL, " ");
+    char *filename = strtok(NULL, " ");
 
     if(!strcmp(command,"DN")) {
 
         std::cout << "download" << std::endl;
+
+        if(len) {
+            std::cout << len << std::endl;
+        } else {
+            std::cerr << "Filename length not defined: " << std::endl;
+        }
+
+        if(filename) {
+            std::cout << filename << std::endl;
+        } else {
+            std::cerr << "Filename not defined: " << std::endl;
+        }
+
+
         
     } else if(!strcmp(command, "UP")) {
 
@@ -147,6 +167,8 @@ void parseCommands(void *com) {
     } else if(!strcmp(command, "LS")) {
 
         std::cout << "ls" << std::endl;
+
+        listing();
 
     } else if(!strcmp(command, "MKDIR")) {
 
@@ -171,6 +193,19 @@ void parseCommands(void *com) {
 
     }
 } 
+
+void listing() {
+    //BOOST FILESYSTEM?
+    DIR *directory;
+    struct dirent *file;
+    char *list[BUFSIZ];
+
+    directory = opendir(".");
+    if(directory) {
+        file = readdir(directory);
+    }
+ 
+}
     
 
 	
