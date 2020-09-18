@@ -14,4 +14,4 @@ myftp:
 	$(CC) client/client.cpp $(FLAGS) -o client/myftp
 
 clean:
-	rm -f client/myftpd client/myftp
+	rm -f server/myftpd client/myftp 
