@@ -13,6 +13,7 @@
 #include<cerrno>
 #include<unistd.h>
 #include<fstream>
+#include<sys/stat.h>
 
 
 char * parseArgs(int, char **);
@@ -21,7 +22,7 @@ void directUser(int);
 char * getCliMsg(int);
 void listing(int);
 void sendToCli(void *, int, int);
-void downloadFile(char *, int);
+void downloadFile(const char *, int);
 
 int main(int argc, char ** argv){
 
@@ -194,9 +195,7 @@ void directUser(int cliFD) {
 
 void listing(int cliFD) {
 
-
-    //BOOST FILESYSTEM?
-    char list[BUFSIZ][BUFSIZ];
+        char list[BUFSIZ][BUFSIZ];
 	FILE * out = popen("ls -l", "r");
 	char buffer[BUFSIZ];
 
@@ -218,17 +217,28 @@ void sendToCli(void * toSend, int len, int cliFD){
 	send(cliFD, toSend, len, 0);	
 }
 
-void downloadFile(char * filey, int cliFD){
+void downloadFile(const char * filey, int cliFD){
 
-	// Check if file exists
+    long int check = 0;
+    struct stat stat_file;
+    char *mdsum = (char *)"md5sum ";
+
 	
+    // Check if file exists and send size to user if it does
+	if(stat(filey, &stat_file) == 0) {
+            check = stat_file.st_size;
+            sendToCli((void *)check, sizeof(check), cliFD);
+        } else {
+            check = -1;
+            sendToCli((void *)check, sizeof(check), cliFD);
+            std::exit(-1);
+        }            
+
+        strcat(mdsum, filey);
 
 	// Get md5Sum and send to client
-	FILE * out = popen("md5sum " + filey, "r");
+	FILE * out = popen(mdsum, "r");
 	
-	// Get Size of File and send to client
-
-
 	// Send file to client
 	std::ifstream ifs;
 
