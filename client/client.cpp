@@ -44,6 +44,7 @@ int get_socket(){
 
 }
 
+
 void handle_DN(int fd, std::string command){
 /* Handle the DN command 
  * Things I could see failing: convert to string, reading into a file*/
@@ -51,23 +52,26 @@ void handle_DN(int fd, std::string command){
 	char buffer[BUFSIZ];
 	std::string arg = get_arg(command);
 	send(fd, (char *)"DN", 2, 0);
+	// Send over the command
+	std::cout << arg << std::endl;
 	send(fd, arg.c_str(), strlen(arg.c_str()), 0);
+	
+	
+	// Recieve the size of the file as a 32 bit int
+	// This might give us endian probs
+	int fileSize;
+	valread = read(fd, (int *)&fileSize, sizeof(fileSize));
+	if (fileSize == (short int)-1){
+		std::cout << "No file found at " << arg << std::endl;
+		return;
+	}
 	
 	//Read in the md5hash
 	valread = read(fd, buffer, BUFSIZ);
 	buffer[valread] = '\0';
 	std::string md5sum = buffer;
-	
-	// Recieve the size of the file as a 32 bit int
-	// This might give us endian probs
-	short int fileSize;
-	valread = read(fd, (short int *)&fileSize, sizeof(fileSize));
-	if (fileSize == (short int)-1){
-		std::cout << "No file found at " << arg << std::endl;
-		return;
-	}
+
 	// Read in the file
-	//std::ostream file(arg, std::ios::out|std::ios::binary);
 	std::ofstream myfile;
 	myfile.open(arg);
 
@@ -78,9 +82,77 @@ void handle_DN(int fd, std::string command){
 	}
 	while (valread > 0);
 	myfile.close();
+	//TODO: calculate the md5sum and print out match status
+	//TODO: print out the time
+}
+
+void handle_UP(int fd, std::string arg){
+	return;
+}
+
+
+void handle_HEAD(int fd, std::string command){
+	int valread;
+	char buffer[BUFSIZ];
+	std::string arg = get_arg(command);
+	send(fd, (char *)"HEAD", 4, 0);
+	// Send over the command
+	std::cout << arg << std::endl;
+	send(fd, arg.c_str(), strlen(arg.c_str()), 0);
+	// Recieve the size of the file as a 32 bit int
+	// possible endian probs
+	int fileSize;
+	valread = read(fd, (int *)&fileSize, sizeof(fileSize));
+	if (fileSize == (int)-1){
+		std::cout << "No file found at " << arg << std::endl;
+		return;
+	}
+	do {
+		valread = read(fd, buffer, BUFSIZ);
+		buffer[valread] = '\0'; // redundant?
+		std::cout << buffer << std::endl;
+	}
+	while (valread > 0);
+	return;
+}
+
+
+void handle_RM(int fd, std::string command) {
+	int valread;
+	char buffer[BUFSIZ];
+	std::string arg = get_arg(command);
+	send(fd, (char *)"RM", 2, 0);
+
+	// send over the command
+	send(fd, arg.c_str(), strlen(arg.c_str()), 0);
+	
+	// recieve a response if file exists
+	int exists;
+	valread = read(fd, (int *)&exists, sizeof(exists));
+	if (valread != 1){
+		std::cout << "File not available to be deleted\n";
+		return;
+	}
+	// confirm user choice and send to server
+	std::cout << "Are you sure? ";
+	std::string response;
+	getline(std::cin, response);
+	send(fd, response.c_str(), strlen(response.c_str()), 0);
+
+	// handle response
+	int deleted;
+	if (response == "Yes"){
+		valread = read(fd, (int *)&deleted, sizeof(deleted));
+		if (deleted == 1)
+			std::cout << "File deleted." << std::endl;
+		else
+			std::cout << "ERROR: File not deleted." << std::endl;
+	}
 	
 
+	return;
 }
+
 
 int main(int argc, char* argv[]){
 	struct hostent *hp; // host info
@@ -130,10 +202,13 @@ int main(int argc, char* argv[]){
 			handle_DN(fd, user_input);
 			break;
 		} else if (command == "UP"){
+			handle_UP(fd, user_input);
 			break;
 		} else if (command == "HEAD"){
+			handle_HEAD(fd, user_input);
 			break;
 		} else if (command == "RM"){
+			handle_RM(fd, user_input);
 			break;
 		} else if (command == "LS"){
 			break;
