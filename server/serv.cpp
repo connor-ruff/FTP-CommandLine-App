@@ -12,13 +12,16 @@
 #include<cstdlib>
 #include<cerrno>
 #include<unistd.h>
+#include<fstream>
 
 
 char * parseArgs(int, char **);
 int getSock(std::string);
 void directUser(int);
-void parseCommands(void *);
-void listing();
+char * getCliMsg(int);
+void listing(int);
+void sendToCli(void *, int, int);
+void downloadFile(char *, int);
 
 int main(int argc, char ** argv){
 
@@ -113,77 +116,72 @@ int getSock(std::string port){
 	return sockfd;
 }
 
-void directUser(int cliFD){
+char * getCliMsg(int cliFD){
 
     char buf[BUFSIZ];
     int received; 
 	
     received = recv(cliFD, buf, BUFSIZ, 0);
 
-    if(received != -1) {
-         parseCommands((void *)buf);
-    } else {
-	std::cerr << "Server failed on recv(): " << std::endl;
+    if(received == -1) {
+		std::cerr << "Server failed on recv(): " << std::endl;
+		std::exit(-1);
     }
+
+	char * ret = buf;
+	return ret;
 }
 
-void parseCommands(void *com) {
-    char *totalCommand = (char *)com;
+void directUser(int cliFD) {
 
-    char *command = strtok(totalCommand, " ");
-    char *len = strtok(NULL, " ");
-    char *filename = strtok(NULL, " ");
-
-    if(!strcmp(command,"DN")) {
-
-        std::cout << "download" << std::endl;
-
-        if(len) {
-            std::cout << len << std::endl;
-        } else {
-            std::cerr << "Filename length not defined: " << std::endl;
-        }
-
-        if(filename) {
-            std::cout << filename << std::endl;
-        } else {
-            std::cerr << "Filename not defined: " << std::endl;
-        }
+	
+	char * msg = getCliMsg(cliFD) ;
 
 
-        
-    } else if(!strcmp(command, "UP")) {
+    if(!strcmp(msg,"DN")) {
 
+		char * fileToDownload = getCliMsg(cliFD);
+		std::cout << fileToDownload << std::endl;
+		downloadFile(fileToDownload, cliFD);
+ 
+    } else if(!strcmp(msg, "UP")) {
         std::cout << "upload" << std::endl;
 
-    } else if(!strcmp(command, "HEAD")) {
+    } else if(!strcmp(msg, "HEAD")) {
 
         std::cout << "head" << std::endl;
+		char * fileToGet = getCliMsg(cliFD);
+		std::cout << fileToGet << std::endl;
 
-    } else if(!strcmp(command, "RM")) {
+    } else if(!strcmp(msg, "RM")) {
 
         std::cout << "rm" << std::endl;
+		char * fileToRem = getCliMsg(cliFD);
+		std::cout << fileToRem << std::endl;
 
-    } else if(!strcmp(command, "LS")) {
+    } else if(!strcmp(msg, "LS")) {
 
         std::cout << "ls" << std::endl;
+        listing(cliFD);
 
-        listing();
-
-    } else if(!strcmp(command, "MKDIR")) {
+    } else if(!strcmp(msg, "MKDIR")) {
 
         std::cout << "mkdir" << std::endl;
+		char * dirName = getCliMsg(cliFD);
+		std::cout << dirName << std::endl;
 
-    }else if(!strcmp(command, "RMDIR")) {
+    }else if(!strcmp(msg, "RMDIR")) {
 
         std::cout << "rmdir" << std::endl;
+		char * dirName = getCliMsg(cliFD);
+		std::cout << dirName << std::endl;
 
-    }else if(!strcmp(command, "CD")) {
+    }else if(!strcmp(msg, "CD")) {
 
         std::cout << "cd" << std::endl;
 
 
-    }else if(!strcmp(command, "QUIT")) {
+    }else if(!strcmp(msg, "QUIT")) {
 
         std::cout << "quit" << std::endl;
 
@@ -194,18 +192,61 @@ void parseCommands(void *com) {
     }
 } 
 
-void listing() {
-    //BOOST FILESYSTEM?
-    DIR *directory;
-    struct dirent *file;
-    char *list[BUFSIZ];
+void listing(int cliFD) {
 
-    directory = opendir(".");
-    if(directory) {
-        file = readdir(directory);
-    }
- 
+
+    //BOOST FILESYSTEM?
+    char list[BUFSIZ][BUFSIZ];
+	FILE * out = popen("ls -l", "r");
+	char buffer[BUFSIZ];
+
+	int size = 0;
+	while( !feof(out) ) {
+		if ( fgets(buffer, sizeof(buffer), out) != NULL) {
+			strcpy(list[size], buffer);
+			size++;
+		}
+	}
+
+	size--;  // Since first entry is not a file
+
+	sendToCli( (void *)&size , sizeof(size), cliFD);
 }
+
+// TODO
+void sendToCli(void * toSend, int len, int cliFD){
+	send(cliFD, toSend, len, 0);	
+}
+
+void downloadFile(char * filey, int cliFD){
+
+	// Check if file exists
+	
+
+	// Get md5Sum and send to client
+	FILE * out = popen("md5sum " + filey, "r");
+	
+	// Get Size of File and send to client
+
+
+	// Send file to client
+	std::ifstream ifs;
+
+	ifs.open(filey);
+	if (!ifs){
+		//TODO: return -1
+		std::exit(-1);
+	}
+	
+	char buf[BUFSIZ];
+	while( ifs.peek() != EOF){
+		ifs.read(buf, BUFSIZ);
+		sendToCli((void *)buf, strlen(buf)+1, cliFD);
+	}
+
+}
+
+
     
 
 	
