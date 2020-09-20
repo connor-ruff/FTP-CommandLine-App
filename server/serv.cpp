@@ -198,7 +198,7 @@ void directUser(int cliFD) {
 
 void listing(int cliFD) {
 
-        char list[BUFSIZ][BUFSIZ];
+    char list[BUFSIZ][BUFSIZ];
 	FILE * out = popen("ls -l", "r");
 	char buffer[BUFSIZ];
 
@@ -258,13 +258,16 @@ void downloadFile(const char * filey, int cliFD){
 
 	
 	// Send file to client
-
+	ifs.close(); // TODO
+	std::exit(0); // TODO
 	
 	char buf[BUFSIZ];
 	while( ifs.peek() != EOF){
 		ifs.read(buf, BUFSIZ);
 		sendToCli((void *)buf, strlen(buf)+1, cliFD);
 	}
+
+	ifs.close()
 
 }
 

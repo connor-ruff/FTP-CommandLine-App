@@ -53,7 +53,7 @@ void handle_DN(int fd, std::string command){
 	std::string arg = get_arg(command);
 	send(fd, (char *)"DN", 2, 0);
 	// Send over the command
-	std::cout << arg << std::endl;
+	std::cout << "File:"<< arg << std::endl;
 	send(fd, arg.c_str(), strlen(arg.c_str()), 0);
 	
 	
