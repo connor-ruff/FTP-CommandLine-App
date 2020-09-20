@@ -14,6 +14,7 @@
 #include<unistd.h>
 #include<fstream>
 #include<sys/stat.h>
+#include<sstream>
 
 
 char * parseArgs(int, char **);
@@ -141,8 +142,10 @@ void directUser(int cliFD) {
 
     if(!strcmp(msg,"DN")) {
 
+		std::cout << "Got DN" << std::endl;
+
 		char * fileToDownload = getCliMsg(cliFD);
-		std::cout << fileToDownload << std::endl;
+		std::cout << "File:"<<fileToDownload << std::endl;
 		downloadFile(fileToDownload, cliFD);
  
     } else if(!strcmp(msg, "UP")) {
@@ -214,39 +217,48 @@ void listing(int cliFD) {
 
 // TODO
 void sendToCli(void * toSend, int len, int cliFD){
-	send(cliFD, toSend, len, 0);	
+	if (  (send(cliFD, toSend, len, 0)) == -1 ) {
+		std::cerr << "Error Sending Info To Client: " << strerror(errno) << std::endl;
+		std::exit(-1);
+	}	
 }
 
 void downloadFile(const char * filey, int cliFD){
-
-    long int check = 0;
-    struct stat stat_file;
-    char *mdsum = (char *)"md5sum ";
-
+    
+	short int check ;
+  //  struct stat stat_file;
+    char mdsum [40] = "md5sum ";
+    strcat(mdsum, filey);
+	std::ifstream ifs;
+	ifs.open(filey);
+	if (!ifs){
+		check = -1;
+		sendToCli( (void *)&check, sizeof(short int), cliFD);
+	}
 	
     // Check if file exists and send size to user if it does
-	if(stat(filey, &stat_file) == 0) {
+/**	if(stat(filey, &stat_file) == 0) {
             check = stat_file.st_size;
             sendToCli((void *)check, sizeof(check), cliFD);
         } else {
             check = -1;
             sendToCli((void *)check, sizeof(check), cliFD);
             std::exit(-1);
-        }            
+        }  **/          
 
-        strcat(mdsum, filey);
 
 	// Get md5Sum and send to client
-	FILE * out = popen(mdsum, "r");
+	FILE * fd = popen(mdsum, "r");
+	char md5sumOutput [30] ;
+	fgets(md5sumOutput, 30, fd);
+	
+	char * hash = strtok(md5sumOutput, " ");
+	sendToCli( (void *)hash, strlen(hash)+1 , cliFD) ;
+
+
 	
 	// Send file to client
-	std::ifstream ifs;
 
-	ifs.open(filey);
-	if (!ifs){
-		//TODO: return -1
-		std::exit(-1);
-	}
 	
 	char buf[BUFSIZ];
 	while( ifs.peek() != EOF){
