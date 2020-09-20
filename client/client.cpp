@@ -31,7 +31,7 @@ void usage(int arg){
 
 std::string get_arg(std::string command){
 	/* seperate the arg from the command */
-	return command.substr(command.find_last_of(' ', command.size()));
+	return command.substr(command.find_last_of(' ', command.size())+1);
 }
 
 int get_socket(){
@@ -53,23 +53,25 @@ void handle_DN(int fd, std::string command){
 	std::string arg = get_arg(command);
 	send(fd, (char *)"DN", 2, 0);
 	// Send over the command
-	std::cout << "File:"<< arg << std::endl;
 	send(fd, arg.c_str(), strlen(arg.c_str()), 0);
+
 	
 	
-	// Recieve the size of the file as a 32 bit int
+	// Recieve the size of the file
 	// This might give us endian probs
-	int fileSize;
+	short int fileSize;
 	valread = read(fd, (int *)&fileSize, sizeof(fileSize));
-	if (fileSize == (short int)-1){
+	if (fileSize == -1){
 		std::cout << "No file found at " << arg << std::endl;
 		return;
 	}
+	std::cout << "Size Recieved: " << fileSize << std::endl; 
 	
 	//Read in the md5hash
 	valread = read(fd, buffer, BUFSIZ);
 	buffer[valread] = '\0';
 	std::string md5sum = buffer;
+	std::cout << "md5hash Recieved: " << buffer << std::endl;
 
 	// Read in the file
 	std::ofstream myfile;

@@ -20,10 +20,10 @@
 char * parseArgs(int, char **);
 int getSock(std::string);
 void directUser(int);
-char * getCliMsg(int);
+void * getCliMsg(int);
 void listing(int);
 void sendToCli(void *, int, int);
-void downloadFile(const char *, int);
+void downloadFile(char *, int);
 
 int main(int argc, char ** argv){
 
@@ -118,10 +118,10 @@ int getSock(std::string port){
 	return sockfd;
 }
 
-char * getCliMsg(int cliFD){
+void * getCliMsg(int cliFD){
 
     char buf[BUFSIZ];
-    int received; 
+    int received;
 	
     received = recv(cliFD, buf, BUFSIZ, 0);
 
@@ -130,22 +130,22 @@ char * getCliMsg(int cliFD){
 		std::exit(-1);
     }
 
-	char * ret = buf;
+	
+	void * ret = buf; 
 	return ret;
 }
 
 void directUser(int cliFD) {
 
 	
-	char * msg = getCliMsg(cliFD) ;
+	char * msg = (char *)getCliMsg(cliFD) ;
 
 
     if(!strcmp(msg,"DN")) {
 
 		std::cout << "Got DN" << std::endl;
 
-		char * fileToDownload = getCliMsg(cliFD);
-		std::cout << "File:"<<fileToDownload << std::endl;
+		char * fileToDownload = (char * ) getCliMsg(cliFD);
 		downloadFile(fileToDownload, cliFD);
  
     } else if(!strcmp(msg, "UP")) {
@@ -154,13 +154,13 @@ void directUser(int cliFD) {
     } else if(!strcmp(msg, "HEAD")) {
 
         std::cout << "head" << std::endl;
-		char * fileToGet = getCliMsg(cliFD);
+		char * fileToGet = (char *)getCliMsg(cliFD);
 		std::cout << fileToGet << std::endl;
 
     } else if(!strcmp(msg, "RM")) {
 
         std::cout << "rm" << std::endl;
-		char * fileToRem = getCliMsg(cliFD);
+		char * fileToRem = (char *)getCliMsg(cliFD);
 		std::cout << fileToRem << std::endl;
 
     } else if(!strcmp(msg, "LS")) {
@@ -171,13 +171,13 @@ void directUser(int cliFD) {
     } else if(!strcmp(msg, "MKDIR")) {
 
         std::cout << "mkdir" << std::endl;
-		char * dirName = getCliMsg(cliFD);
+		char * dirName = (char *)getCliMsg(cliFD);
 		std::cout << dirName << std::endl;
 
     }else if(!strcmp(msg, "RMDIR")) {
 
         std::cout << "rmdir" << std::endl;
-		char * dirName = getCliMsg(cliFD);
+		char * dirName = (char *)getCliMsg(cliFD);
 		std::cout << dirName << std::endl;
 
     }else if(!strcmp(msg, "CD")) {
@@ -223,19 +223,18 @@ void sendToCli(void * toSend, int len, int cliFD){
 	}	
 }
 
-void downloadFile(const char * filey, int cliFD){
-    
-	short int check ;
-  //  struct stat stat_file;
-    char mdsum [40] = "md5sum ";
-    strcat(mdsum, filey);
+void downloadFile(char * filey, int cliFD){
+	std::string filename = filey; 
 	std::ifstream ifs;
-	ifs.open(filey);
+	ifs.open(filename);
+	short int check ;
 	if (!ifs){
+		std::cout << "File Not Found" << std::endl;
 		check = -1;
 		sendToCli( (void *)&check, sizeof(short int), cliFD);
+		return;
 	}
-	
+
     // Check if file exists and send size to user if it does
 /**	if(stat(filey, &stat_file) == 0) {
             check = stat_file.st_size;
@@ -246,28 +245,37 @@ void downloadFile(const char * filey, int cliFD){
             std::exit(-1);
         }  **/          
 
+	// Send file size
+    struct stat stat_file;
+	if (    (stat(filename.c_str(), &stat_file)) == -1 ){
+		std::cerr << "Error on Stat: " << strerror(errno) << std::endl;
+	}
+	check = stat_file.st_size;
+	std::cout << "File Inode: " << stat_file.st_ino << std::endl;
+	std::cout << "Sending file size: " << stat_file.st_size << std::endl;
+	sendToCli( (void *)&check, sizeof(short int), cliFD);
 
 	// Get md5Sum and send to client
+    char mdsum [40] = "md5sum ";
+    strcat(mdsum, filename.c_str());
 	FILE * fd = popen(mdsum, "r");
 	char md5sumOutput [30] ;
 	fgets(md5sumOutput, 30, fd);
 	
 	char * hash = strtok(md5sumOutput, " ");
+
+	std::cout << "Sending hash: " << hash << std::endl;
 	sendToCli( (void *)hash, strlen(hash)+1 , cliFD) ;
 
 
-	
-	// Send file to client
-	ifs.close(); // TODO
-	std::exit(0); // TODO
-	
+		
 	char buf[BUFSIZ];
 	while( ifs.peek() != EOF){
 		ifs.read(buf, BUFSIZ);
 		sendToCli((void *)buf, strlen(buf)+1, cliFD);
 	}
 
-	ifs.close()
+	ifs.close();
 
 }
 
