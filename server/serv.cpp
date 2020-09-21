@@ -252,8 +252,6 @@ void downloadFile(char * filey, int cliFD){
 		std::cerr << "Error on Stat: " << strerror(errno) << std::endl;
 	}
 	check = stat_file.st_size;
-	std::cout << "File Inode: " << stat_file.st_ino << std::endl;
-	std::cout << "Sending file size: " << stat_file.st_size << std::endl;
 	sendToCli( (void *)&check, sizeof(short int), cliFD);
 
 	// Get md5Sum and send to client
@@ -265,7 +263,6 @@ void downloadFile(char * filey, int cliFD){
 	
 	char * hash = strtok(md5sumOutput, " ");
 
-	std::cout << "Sending hash: " << hash <<  std::endl;
 	sendToCli( (void *)hash, strlen(hash)+1 , cliFD) ;
 	
 	char buf[BUFSIZ];
@@ -276,10 +273,8 @@ void downloadFile(char * filey, int cliFD){
 		ifs.read(buf, BUFSIZ);
                 std::cout << buf << std::endl;
 		siz = sendToCli((void *)buf, strlen(buf), cliFD);
-                std::cout << "Sent: " << siz << " bytes" << std::endl;
         }
 	
-	std::cout << "End of Loop\n" << std::endl;
 
 	ifs.close();
 

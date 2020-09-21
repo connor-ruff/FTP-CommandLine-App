@@ -65,24 +65,21 @@ void handle_DN(int fd, std::string command){
 		std::cout << "No file found at " << arg << std::endl;
 		return;
 	}
-	std::cout << "Size Recieved: " << fileSize << std::endl; 
 	
 	//Read in the md5hash
 	valread = read(fd, buffer, BUFSIZ);
 	buffer[valread] = '\0';
 	std::string md5sum = buffer;
-	std::cout << "md5hash Recieved: " << buffer << std::endl;
 
 	// Read in the file
 	std::ofstream myfile;
-	myfile.open("newFile.txt"); // TODO: make argument "arg"
+	myfile.open("newFile.txt"); 
 
 
 	int totalSent = 0;
 	bzero( &buffer, sizeof(buffer));
 	while( (valread	= recv(fd, buffer, fileSize, 0))  > 0 ){
 		totalSent += valread ;
-		std::cout << "Recieved " << valread << " bytes. Total: " << totalSent << std::endl;
 		myfile << buffer; 
 		bzero( &buffer, sizeof(buffer));
 		if ( totalSent >= fileSize ) {
@@ -101,6 +98,9 @@ void handle_DN(int fd, std::string command){
 
 	char * hash = strtok(md5sumOutput, " ");
 	std::cout << "Client-Calculated Hash: " << hash << std::endl;
+	if ( !strcmp(md5sum.c_str(), hash) ){
+		std::cout << "Good\n" << std::endl;
+	}
 
 	return;	
 	
