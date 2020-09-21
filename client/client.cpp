@@ -79,8 +79,10 @@ void handle_DN(int fd, std::string command){
 
 	do {
 		valread = read(fd, buffer, BUFSIZ);
-		buffer[valread] = '\0'; // this line might be redundant
+		std::cout <<"Recieved: " <<  buffer << std::endl;
+		// buffer[valread] = '\0'; // this line might be redundant
 		myfile << buffer;
+		break;
 	}
 	while (valread > 0);
 	myfile.close();
