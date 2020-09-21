@@ -22,8 +22,9 @@ int getSock(std::string);
 void directUser(int);
 void * getCliMsg(int);
 void listing(int);
-void sendToCli(void *, int, int);
+size_t sendToCli(void *, int, int);
 void downloadFile(char *, int);
+void uploadFile(char *, int);
 
 int main(int argc, char ** argv){
 
@@ -48,7 +49,6 @@ int main(int argc, char ** argv){
                     std::cout << "Connection Established" << std::endl;
 
                 }
-
 
 		// Recieve information
 		directUser(cliFD); 
@@ -130,26 +130,28 @@ void * getCliMsg(int cliFD){
 		std::exit(-1);
     }
 
+        buf[received] = '\0';
 	
 	void * ret = buf; 
 	return ret;
 }
 
 void directUser(int cliFD) {
-
 	
-	char * msg = (char *)getCliMsg(cliFD) ;
-
+    char * msg = (char *)getCliMsg(cliFD) ;
 
     if(!strcmp(msg,"DN")) {
 
-		std::cout << "Got DN" << std::endl;
+	std::cout << "Got DN" << std::endl;
 
-		char * fileToDownload = (char * ) getCliMsg(cliFD);
-		downloadFile(fileToDownload, cliFD);
+	char * fileToDownload = (char * ) getCliMsg(cliFD);
+	downloadFile(fileToDownload, cliFD);
  
     } else if(!strcmp(msg, "UP")) {
+
         std::cout << "upload" << std::endl;
+        char *fileToUpload = (char * ) getCliMsg(cliFD);
+        uploadFile(fileToUpload, cliFD);
 
     } else if(!strcmp(msg, "HEAD")) {
 
@@ -216,11 +218,15 @@ void listing(int cliFD) {
 }
 
 // TODO
-void sendToCli(void * toSend, int len, int cliFD){
-	if (  (send(cliFD, toSend, len, 0)) == -1 ) {
+size_t sendToCli(void * toSend, int len, int cliFD){
+    size_t sent = send(cliFD, toSend, len, 0);
+	if ( sent == -1 ) {
 		std::cerr << "Error Sending Info To Client: " << strerror(errno) << std::endl;
 		std::exit(-1);
-	}	
+	}
+
+        return sent;
+                
 }
 
 void downloadFile(char * filey, int cliFD){
@@ -234,16 +240,68 @@ void downloadFile(char * filey, int cliFD){
 		sendToCli( (void *)&check, sizeof(short int), cliFD);
 		return;
 	}
+   
 
-    // Check if file exists and send size to user if it does
-/**	if(stat(filey, &stat_file) == 0) {
-            check = stat_file.st_size;
-            sendToCli((void *)check, sizeof(check), cliFD);
-        } else {
-            check = -1;
-            sendToCli((void *)check, sizeof(check), cliFD);
-            std::exit(-1);
-        }  **/          
+	// Send file size
+    struct stat stat_file;
+	if (    (stat(filename.c_str(), &stat_file)) == -1 ){
+		std::cerr << "Error on Stat: " << strerror(errno) << std::endl;
+	}
+	check = stat_file.st_size;
+	std::cout << "File Inode: " << stat_file.st_ino << std::endl;
+	std::cout << "Sending file size: " << stat_file.st_size << std::endl;
+	sendToCli( (void *)&check, sizeof(short int), cliFD);
+
+	// Get md5Sum and send to client
+    char mdsum [40] = "md5sum ";
+    strcat(mdsum, filename.c_str());
+	FILE * fd = popen(mdsum, "r");
+	char md5sumOutput [50] ;
+	fgets(md5sumOutput, 50, fd);
+	
+	char * hash = strtok(md5sumOutput, " ");
+
+	std::cout << "Sending hash: " << hash << std::endl;
+	sendToCli( (void *)hash, strlen(hash)+1 , cliFD) ;
+
+
+		
+	char buf[BUFSIZ];
+        bzero(&buf, BUFSIZ);
+        size_t siz;
+	while( ifs.peek() != EOF){
+		ifs.read(buf, BUFSIZ);
+                std::cout << buf << std::endl;
+		siz = sendToCli((void *)buf, strlen(buf), cliFD);
+                std::cout << siz << std::endl;
+        }
+
+	ifs.close();
+
+}
+
+
+void uploadFile(char * filey, int cliFD){
+	/*std::string filename = filey; 
+	std::ofstream ofs (filename);
+	ifs.open(filename);
+	short int check;
+	if (!ifs){
+		std::cout << "File Not Made" << std::endl;
+		check = -1;
+		sendToCli( (void *)&check, sizeof(short int), cliFD);
+		return;
+	} 
+
+        // acknowledge ready to recieve
+        char *ready = "Ready to recieve.";
+        sendToCli((void *)ready, sizeof(ready), cliFD);
+
+        // get size of file
+
+
+
+   
 
 	// Send file size
     struct stat stat_file;
@@ -272,15 +330,15 @@ void downloadFile(char * filey, int cliFD){
 	char buf[BUFSIZ];
 	while( ifs.peek() != EOF){
 		ifs.read(buf, BUFSIZ);
+                printf("%s", buf);
 		sendToCli((void *)buf, strlen(buf)+1, cliFD);
+                bzero(&buf, sizeof(buf));
 	}
 
-	ifs.close();
+	ifs.close(); */
 
-}
+} 
 
-
-    
 
 	
 	
