@@ -137,65 +137,69 @@ void * getCliMsg(int cliFD){
 }
 
 void directUser(int cliFD) {
-	
-    char * msg = (char *)getCliMsg(cliFD) ;
 
-    if(!strcmp(msg,"DN")) {
+	while (true) {	
 
-	std::cout << "Got DN" << std::endl;
+		char * msg = (char *)getCliMsg(cliFD) ;
 
-	char * fileToDownload = (char * ) getCliMsg(cliFD);
-	downloadFile(fileToDownload, cliFD);
+		if(!strcmp(msg,"DN")) {
+
+			std::cout << "Got DN" << std::endl;
+
+			char * fileToDownload = (char * ) getCliMsg(cliFD);
+			downloadFile(fileToDownload, cliFD);
  
-    } else if(!strcmp(msg, "UP")) {
+		 } else if(!strcmp(msg, "UP")) {
 
-        std::cout << "upload" << std::endl;
-        char *fileToUpload = (char * ) getCliMsg(cliFD);
-        uploadFile(fileToUpload, cliFD);
+			std::cout << "upload" << std::endl;
+			char *fileToUpload = (char * ) getCliMsg(cliFD);
+			uploadFile(fileToUpload, cliFD);
 
-    } else if(!strcmp(msg, "HEAD")) {
+		 } else if(!strcmp(msg, "HEAD")) {
 
-        std::cout << "head" << std::endl;
-		char * fileToGet = (char *)getCliMsg(cliFD);
-		std::cout << fileToGet << std::endl;
+			std::cout << "head" << std::endl;
+			char * fileToGet = (char *)getCliMsg(cliFD);
+			std::cout << fileToGet << std::endl;
 
-    } else if(!strcmp(msg, "RM")) {
+		} else if(!strcmp(msg, "RM")) {
 
-        std::cout << "rm" << std::endl;
-		char * fileToRem = (char *)getCliMsg(cliFD);
-		std::cout << fileToRem << std::endl;
+			std::cout << "rm" << std::endl;
+			char * fileToRem = (char *)getCliMsg(cliFD);
+			std::cout << fileToRem << std::endl;
 
-    } else if(!strcmp(msg, "LS")) {
+		} else if(!strcmp(msg, "LS")) {
 
-        std::cout << "ls" << std::endl;
-        listing(cliFD);
+			std::cout << "ls" << std::endl;
+			listing(cliFD);
 
-    } else if(!strcmp(msg, "MKDIR")) {
+		} else if(!strcmp(msg, "MKDIR")) {
 
-        std::cout << "mkdir" << std::endl;
-		char * dirName = (char *)getCliMsg(cliFD);
-		std::cout << dirName << std::endl;
+			std::cout << "mkdir" << std::endl;
+			char * dirName = (char *)getCliMsg(cliFD);
+			std::cout << dirName << std::endl;
 
-    }else if(!strcmp(msg, "RMDIR")) {
+		}else if(!strcmp(msg, "RMDIR")) {
 
-        std::cout << "rmdir" << std::endl;
-		char * dirName = (char *)getCliMsg(cliFD);
-		std::cout << dirName << std::endl;
+			std::cout << "rmdir" << std::endl;
+			char * dirName = (char *)getCliMsg(cliFD);
+			std::cout << dirName << std::endl;
 
-    }else if(!strcmp(msg, "CD")) {
+		}else if(!strcmp(msg, "CD")) {
 
-        std::cout << "cd" << std::endl;
+			std::cout << "cd" << std::endl;
 
 
-    }else if(!strcmp(msg, "QUIT")) {
+		}else if(!strcmp(msg, "QUIT")) {
 
-        std::cout << "quit" << std::endl;
+			std::cout << "quit" << std::endl;
 
-    } else {
+		 } else {
 
-        std::cerr << "Command not recognized: " << std::endl;
+			std::cerr << "Command not recognized: " << std::endl;
 
-    }
+		 }
+
+	}
 } 
 
 void listing(int cliFD) {
@@ -261,22 +265,25 @@ void downloadFile(char * filey, int cliFD){
 	
 	char * hash = strtok(md5sumOutput, " ");
 
-	std::cout << "Sending hash: " << hash << std::endl;
+	std::cout << "Sending hash: " << hash <<  std::endl;
 	sendToCli( (void *)hash, strlen(hash)+1 , cliFD) ;
-
-
-		
+	
 	char buf[BUFSIZ];
-        bzero(&buf, BUFSIZ);
-        size_t siz;
+    bzero(&buf, BUFSIZ);
+    size_t siz;
+
 	while( ifs.peek() != EOF){
 		ifs.read(buf, BUFSIZ);
                 std::cout << buf << std::endl;
 		siz = sendToCli((void *)buf, strlen(buf), cliFD);
-                std::cout << siz << std::endl;
+                std::cout << "Sent: " << siz << " bytes" << std::endl;
         }
+	
+	std::cout << "End of Loop\n" << std::endl;
 
 	ifs.close();
+
+	return;
 
 }
 

@@ -75,7 +75,7 @@ void handle_DN(int fd, std::string command){
 
 	// Read in the file
 	std::ofstream myfile;
-	myfile.open(arg);
+	myfile.open("newFile.txt"); // TODO: make argument "arg"
 
 
 	int totalSent = 0;
@@ -232,6 +232,7 @@ int main(int argc, char* argv[]){
 		} else if (command == "RMDIR"){
 		} else if (command == "CD"){
 		} else if (command == "QUIT"){
+			break;
 		} else {
 		}
 
