@@ -77,14 +77,33 @@ void handle_DN(int fd, std::string command){
 	std::ofstream myfile;
 	myfile.open(arg);
 
-	do {
-		valread = read(fd, buffer, BUFSIZ);
-		buffer[valread] = '\0'; // this line might be redundant
-		myfile << buffer;
+
+	int totalSent = 0;
+	bzero( &buffer, sizeof(buffer));
+	while( (valread	= recv(fd, buffer, fileSize, 0))  > 0 ){
+		totalSent += valread ;
+		std::cout << "Recieved " << valread << " bytes. Total: " << totalSent << std::endl;
+		myfile << buffer; 
+		bzero( &buffer, sizeof(buffer));
+		if ( totalSent >= fileSize ) {
+			break;
+		}
 	}
-	while (valread > 0);
+		
 	myfile.close();
+
 	//TODO: calculate the md5sum and print out match status
+	char newmd5sum [40] = "md5sum ";
+	strcat(newmd5sum, arg.c_str());
+	FILE * dfile = popen(newmd5sum, "r");
+	char md5sumOutput [50] ;
+	fgets(md5sumOutput, 50, dfile);
+
+	char * hash = strtok(md5sumOutput, " ");
+	std::cout << "Client-Calculated Hash: " << hash << std::endl;
+
+	return;	
+	
 	//TODO: print out the time
 }
 
@@ -115,6 +134,7 @@ void handle_HEAD(int fd, std::string command){
 		std::cout << buffer << std::endl;
 	}
 	while (valread > 0);
+
 	return;
 }
 
@@ -202,26 +222,17 @@ int main(int argc, char* argv[]){
 		//send(fd, user_input.c_str(), strlen(user_input.c_str()), 0);
 		if (command == "DN"){
 			handle_DN(fd, user_input);
-			break;
 		} else if (command == "UP"){
 			handle_UP(fd, user_input);
-			break;
 		} else if (command == "HEAD"){
 			handle_HEAD(fd, user_input);
-			break;
 		} else if (command == "RM"){
 			handle_RM(fd, user_input);
-			break;
 		} else if (command == "LS"){
-			break;
 		} else if (command == "RMDIR"){
-			break;
 		} else if (command == "CD"){
-			break;
 		} else if (command == "QUIT"){
-			break;
 		} else {
-			break;
 		}
 
 
