@@ -15,6 +15,7 @@
 #include<fstream>
 #include<sys/stat.h>
 #include<sstream>
+#include<algorithm>
 
 
 char * parseArgs(int, char **);
@@ -34,13 +35,14 @@ int main(int argc, char ** argv){
 
 	// Estbalish sock
 	int sockfd = getSock(port);
-	std::cout << "Waiting for connection on port " << port << "...\n" ;
+	
 
 	// Accept a Connection
 	int cliFD;
 	struct sockaddr_in cliAddr;
 	int addr_len = sizeof(cliAddr);
 	while (true){
+                std::cout << "Waiting for connection on port " << port << "...\n" ;
 		if ( (cliFD = accept(sockfd, (struct sockaddr *)&cliAddr, (socklen_t *) &addr_len)) < 0){
 			std::cerr << "Error on Accepting Client Connection" << std::endl;
 			std::exit(-1);
@@ -122,8 +124,12 @@ void * getCliMsg(int cliFD){
 
     char buf[BUFSIZ];
     int received;
+
+    bzero(&buf, sizeof(buf));
 	
     received = recv(cliFD, buf, BUFSIZ, 0);
+
+    std::cout << "BUFFER: " << buf << std::endl;
 
     if(received == -1) {
 		std::cerr << "Server failed on recv(): " << std::endl;
@@ -131,6 +137,8 @@ void * getCliMsg(int cliFD){
     }
 
         buf[received] = '\0';
+
+
 	
 	void * ret = buf; 
 	return ret;
@@ -141,10 +149,11 @@ void directUser(int cliFD) {
 	while (true) {	
 
 		char * msg = (char *)getCliMsg(cliFD) ;
+                std::cout << "MESSAGE: " << msg << std::endl;
 
 		if(!strcmp(msg,"DN")) {
 
-			std::cout << "Got DN" << std::endl;
+			// std::cout << "Got DN" << std::endl;
 
 			char * fileToDownload = (char * ) getCliMsg(cliFD);
 			downloadFile(fileToDownload, cliFD);
@@ -178,24 +187,26 @@ void directUser(int cliFD) {
 			char * dirName = (char *)getCliMsg(cliFD);
 			std::cout << dirName << std::endl;
 
-		}else if(!strcmp(msg, "RMDIR")) {
+		} else if(!strcmp(msg, "RMDIR")) {
 
 			std::cout << "rmdir" << std::endl;
 			char * dirName = (char *)getCliMsg(cliFD);
 			std::cout << dirName << std::endl;
 
-		}else if(!strcmp(msg, "CD")) {
+		} else if(!strcmp(msg, "CD")) {
 
 			std::cout << "cd" << std::endl;
 
 
-		}else if(!strcmp(msg, "QUIT")) {
+		} else if(!strcmp(msg, "QUIT")) {
 
 			std::cout << "quit" << std::endl;
+                        break;
 
 		 } else {
 
 			std::cerr << "Command not recognized: " << std::endl;
+                        break;
 
 		 }
 
@@ -227,7 +238,7 @@ size_t sendToCli(void * toSend, int len, int cliFD){
 	if ( sent == -1 ) {
 		std::cerr << "Error Sending Info To Client: " << strerror(errno) << std::endl;
 		std::exit(-1);
-	}
+	} 
 
         return sent;
                 
@@ -235,48 +246,74 @@ size_t sendToCli(void * toSend, int len, int cliFD){
 
 void downloadFile(char * filey, int cliFD){
 	std::string filename = filey; 
-	std::ifstream ifs;
-	ifs.open(filename);
-	short int check ;
-	if (!ifs){
+	//std::ifstream ifs;
+        FILE *fd = fopen(filey, "rb");
+	//ifs.open(filename);
+	int check ;
+	if (!fd){
 		std::cout << "File Not Found" << std::endl;
 		check = -1;
-		sendToCli( (void *)&check, sizeof(short int), cliFD);
+		sendToCli( (void *)&check, sizeof(int), cliFD);
 		return;
 	}
    
 
 	// Send file size
-    struct stat stat_file;
+        struct stat stat_file;
 	if (    (stat(filename.c_str(), &stat_file)) == -1 ){
 		std::cerr << "Error on Stat: " << strerror(errno) << std::endl;
 	}
 	check = stat_file.st_size;
-	sendToCli( (void *)&check, sizeof(short int), cliFD);
+	sendToCli( (void *)&check, sizeof(int), cliFD);
 
 	// Get md5Sum and send to client
-    char mdsum [40] = "md5sum ";
-    strcat(mdsum, filename.c_str());
-	FILE * fd = popen(mdsum, "r");
+        char mdsum [40] = "md5sum ";
+        strcat(mdsum, filename.c_str());
+	FILE * fsum = popen(mdsum, "r");
 	char md5sumOutput [50] ;
-	fgets(md5sumOutput, 50, fd);
+	fgets(md5sumOutput, 50, fsum);
 	
 	char * hash = strtok(md5sumOutput, " ");
 
 	sendToCli( (void *)hash, strlen(hash)+1 , cliFD) ;
 	
 	char buf[BUFSIZ];
-    bzero(&buf, BUFSIZ);
-    size_t siz;
+        size_t siz;
+        size_t ck;
+        size_t num;
 
-	while( ifs.peek() != EOF){
-		ifs.read(buf, BUFSIZ);
-                std::cout << buf << std::endl;
-		siz = sendToCli((void *)buf, strlen(buf), cliFD);
+	if(check > 0){
+            bzero(&buf, BUFSIZ);
+            do {
+                if(check < sizeof(buf)) {
+                    num = check;
+                } else {
+                    num = sizeof(buf);
+                }
+
+                num = fread(buf, 1, num, fd);
+                ck = (size_t)strlen(buf);
+
+                sendToCli((void *)ck, sizeof(size_t), cliFD);
+
+                if(num < 1) {
+                    std::cout << "NUM" << std::endl;
+                    break;
+                }
+                if(!(siz = sendToCli((void *)buf, strlen(buf), cliFD))) {
+                    std::cout << "SEND" << std::endl;
+                    break;
+                } else { 
+                    std::cout << "SIZE " << strlen(buf) << std::endl;
+                }
+                check -= num;
+            }
+            while (check > 0);
         }
 	
+        std::cout << "END OF DOWNLOAD" << std::endl;
 
-	ifs.close();
+	fclose(fd);
 
 	return;
 
@@ -284,22 +321,43 @@ void downloadFile(char * filey, int cliFD){
 
 
 void uploadFile(char * filey, int cliFD){
-	/*std::string filename = filey; 
+	/*
+        std::string filename = filey; 
 	std::ofstream ofs (filename);
 	ifs.open(filename);
-	short int check;
+        short int check;
 	if (!ifs){
 		std::cout << "File Not Made" << std::endl;
-		check = -1;
-		sendToCli( (void *)&check, sizeof(short int), cliFD);
+                check = -1;
 		return;
 	} 
 
         // acknowledge ready to recieve
-        char *ready = "Ready to recieve.";
-        sendToCli((void *)ready, sizeof(ready), cliFD);
+        sendToCli((void *)check, sizeof(check), cliFD);
 
         // get size of file
+        short int fileSize;
+	valread = read(fd, (int *)&fileSize, sizeof(fileSize));
+	if (fileSize == -1){
+		return;
+	}
+
+        char buffer[BUFSIZ];
+        int totalSent = 0;
+	bzero( &buffer, sizeof(buffer));
+	while( (valread	= recv(fd, buffer, fileSize, 0))  > 0 ){
+		totalSent += valread ;
+		ofs << buffer;
+		bzero( &buffer, sizeof(buffer));
+		if ( totalSent >= fileSize ) {
+			break;
+		}
+
+        }
+
+
+
+
 
 
 
