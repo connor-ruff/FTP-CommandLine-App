@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
-
+#include <sys/time.h>
 #include <iostream>
 #include <string>
 #include <bits/stdc++.h>
@@ -60,36 +60,72 @@ void handle_DN(int fd, std::string command){
 	
 	// Recieve the size of the file
 	// This might give us endian probs
-	short int fileSize;
+	int fileSize;
 	valread = read(fd, (int *)&fileSize, sizeof(fileSize));
 	if (fileSize == -1){
 		std::cout << "No file found at " << arg << std::endl;
 		return;
 	}
-	
+	std::cout << "Filesize: " << fileSize << std::endl; //TODO	
 	//Read in the md5hash
 	valread = read(fd, buffer, BUFSIZ);
 	buffer[valread] = '\0';
 	std::string md5sum = buffer;
 
+	std::cout << "Hash From Serv: " << md5sum << "  (size: " << md5sum.size() << ")." <<  std::endl; //TODO
+
+
 	// Read in the file
 	std::ofstream myfile;
-	myfile.open("newFile.txt"); 
+	//myfile.open(arg); 
 
-
+	
 	int totalSent = 0;
 	bzero( &buffer, sizeof(buffer));
-	while( (valread	= recv(fd, buffer, fileSize, 0))  > 0 ){
-		totalSent += valread ;
-		myfile << buffer; 
-		bzero( &buffer, sizeof(buffer));
-		if ( totalSent >= fileSize ) {
-			break;
-		}
-	}
-		
-	myfile.close();
+	// Start Calculating time
+	struct timeval b4 ;
+	gettimeofday(&b4, NULL);
 
+
+	// Manipulate recieve maximum based on filesize
+	size_t sizey;
+/**	if (fileSize > BUFSIZ){
+		sizey = BUFSIZ;
+	}
+	else 
+		sizey = fileSize; **/
+
+
+	FILE * wf = fopen(arg.c_str(), "wb");
+
+	std::cout << "Recieving File.... " << std::endl << std::endl; //TODO
+
+	while( totalSent < fileSize ){
+		recv(fd, (void *)&sizey, sizeof(size_t), 0);
+
+		valread = recv(fd, buffer, sizey, 0);
+		totalSent += valread ;
+	//	std::cout << "(Recieved " << valread << " bytes)." ; // Buffer: " << buffer << std::endl; //TODO
+		fwrite(buffer, 1, valread, wf);                              // TODO 
+		// myfile << buffer ;
+		bzero( &buffer, sizeof(buffer));
+		// if ( totalSent >= fileSize ) {
+		//	break;
+		//}
+	//	std::cout << "end of while loop..." << std::endl;
+	}
+
+	std::cout << "recv return: " << valread << std::endl;
+
+	struct timeval after;
+    gettimeofday(&after, NULL);
+	fclose(wf);
+		
+//	myfile.close();
+	
+	float elapsedTime = ( ((after.tv_sec - b4.tv_sec) * 1000000) + (after.tv_usec - b4.tv_usec) ) ;
+	float throughPut = (  (fileSize * 8) ) / ( elapsedTime / 1000000) ;
+	std::cout << fileSize << " bytes transferred in " << elapsedTime / 1000000 << " seconds: " << throughPut << " bits/sec" << std::endl;
 	// calculate the md5sum and print out match status
 	char newmd5sum [40] = "md5sum ";
 	strcat(newmd5sum, arg.c_str());
@@ -98,14 +134,18 @@ void handle_DN(int fd, std::string command){
 	fgets(md5sumOutput, 50, dfile);
 
 	char * hash = strtok(md5sumOutput, " ");
-	std::cout << "Client-Calculated Hash: " << hash << std::endl;
+	std::cout << "MD5 Hash: " << md5sumOutput ;
 	if ( !strcmp(md5sum.c_str(), hash) ){
-		std::cout << "Good\n" << std::endl;
+		std::cout << " (matches)"  << std::endl;
 	}
+	else {
+		std::cout << "\nERROR: Hash's do not match. Download CORRUPTED" << std::endl;
+		return;
+	}
+
 
 	return;	
 	
-	//TODO: print out the time
 }
 
 void handle_UP(int fd, std::string arg){
