@@ -12,6 +12,7 @@
 #include <iostream>
 #include <string>
 #include <bits/stdc++.h>
+#include <sys/stat.h>
 
 
 char* PROGRAM_NAME;
@@ -89,7 +90,7 @@ void handle_DN(int fd, std::string command){
 		
 	myfile.close();
 
-	//TODO: calculate the md5sum and print out match status
+	// calculate the md5sum and print out match status
 	char newmd5sum [40] = "md5sum ";
 	strcat(newmd5sum, arg.c_str());
 	FILE * dfile = popen(newmd5sum, "r");
@@ -108,6 +109,46 @@ void handle_DN(int fd, std::string command){
 }
 
 void handle_UP(int fd, std::string arg){
+	std::string filename = arg;
+	std::ifstream ifs;
+	ifs.open(filename);
+	short int check;
+	if(!ifs){
+		std::cout << "File Not Found" << std::endl;
+		check = -1;
+		send(fd, (void *)&check, sizeof(check), 0);
+		return;
+	}
+	// Send file size
+	struct stat stat_file;
+	if( (stat(filename.c_str(), &stat_file)) == -1){
+		std::cerr << "Error on Stat: " << strerror(errno) << std::endl;
+	}
+
+	check = stat_file.st_size;
+	send(fd, (void *)&check, sizeof(short int), 0);
+
+	// Get md5Sum and send to client
+	char mdsum[40] = "md5sum ";
+	strcat(mdsum, filename.c_str());
+	FILE* fileFd = popen(mdsum, "r");
+	char md5sumOutput [50];
+	fgets(md5sumOutput, 50, fileFd);
+
+	char * hash = strtok(md5sumOutput, " ");
+	send(fd, (void *)hash, strlen(hash)+1, 0);
+
+	char buf[BUFSIZ];
+	bzero(&buf, BUFSIZ);
+	size_t siz;
+
+	while (ifs.peek() != EOF){
+		ifs.read(buf, BUFSIZ);
+		std::cout << buf << std::endl;
+		siz = send(fd, (void *)buf, strlen(buf), 0);
+	}
+	ifs.close();
+
 	return;
 }
 
