@@ -13,6 +13,7 @@
 #include <string>
 #include <bits/stdc++.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 
 char* PROGRAM_NAME;
@@ -47,15 +48,16 @@ int get_socket(){
 
 
 void handle_DN(int fd, std::string command){
-/* Handle the DN command 
- * Things I could see failing: convert to string, reading into a file*/
+/* Client Side implementation of the DN request */
 	int valread;
 	char buffer[BUFSIZ];
 	std::string arg = get_arg(command);
-	send(fd, (char *)"DN", 2, 0);
+	send(fd, (char *)"DN", strlen("DN")+1, 0);
+	usleep(100); // TODO This might not be neccessary but it seemed like things where sending too fast and it was causing bugs for me
 	// Send over the command
-	send(fd, arg.c_str(), strlen(arg.c_str()), 0);
-
+	std::cout << "arg is " << arg << std::endl;
+	send(fd, arg.c_str(), strlen(arg.c_str())+1, 0);
+	std::cout << "Sent over the command\n";
 	
 	
 	// Recieve the size of the file
@@ -75,10 +77,6 @@ void handle_DN(int fd, std::string command){
 	std::cout << "Hash From Serv: " << md5sum << "  (size: " << md5sum.size() << ")." <<  std::endl; //TODO
 
 
-	// Read in the file
-	std::ofstream myfile;
-	//myfile.open(arg); 
-
 	
 	int totalSent = 0;
 	bzero( &buffer, sizeof(buffer));
@@ -89,43 +87,36 @@ void handle_DN(int fd, std::string command){
 
 	// Manipulate recieve maximum based on filesize
 	size_t sizey;
-/**	if (fileSize > BUFSIZ){
+	if (fileSize > BUFSIZ){
 		sizey = BUFSIZ;
 	}
 	else 
-		sizey = fileSize; **/
+		sizey = fileSize;
 
 
-	FILE * wf = fopen(arg.c_str(), "wb");
+	FILE * wf = fopen(arg.c_str(), "wb"); // where to store file
 
-	std::cout << "Recieving File.... " << std::endl << std::endl; //TODO
-
+	std::cout << "Recieving File.... " << std::endl << std::endl;
 	while( totalSent < fileSize ){
-		recv(fd, (void *)&sizey, sizeof(size_t), 0);
-
 		valread = recv(fd, buffer, sizey, 0);
-		totalSent += valread ;
-	//	std::cout << "(Recieved " << valread << " bytes)." ; // Buffer: " << buffer << std::endl; //TODO
-		fwrite(buffer, 1, valread, wf);                              // TODO 
-		// myfile << buffer ;
+		totalSent += valread;
+		fwrite(buffer, 1, valread, wf);                            
 		bzero( &buffer, sizeof(buffer));
-		// if ( totalSent >= fileSize ) {
-		//	break;
-		//}
-	//	std::cout << "end of while loop..." << std::endl;
+		 if ( totalSent >= fileSize ) {
+			break;
+		}
 	}
 
-	std::cout << "recv return: " << valread << std::endl;
 
 	struct timeval after;
     gettimeofday(&after, NULL);
 	fclose(wf);
 		
-//	myfile.close();
 	
 	float elapsedTime = ( ((after.tv_sec - b4.tv_sec) * 1000000) + (after.tv_usec - b4.tv_usec) ) ;
 	float throughPut = (  (fileSize * 8) ) / ( elapsedTime / 1000000) ;
 	std::cout << fileSize << " bytes transferred in " << elapsedTime / 1000000 << " seconds: " << throughPut << " bits/sec" << std::endl;
+
 	// calculate the md5sum and print out match status
 	char newmd5sum [40] = "md5sum ";
 	strcat(newmd5sum, arg.c_str());
@@ -142,14 +133,12 @@ void handle_DN(int fd, std::string command){
 		std::cout << "\nERROR: Hash's do not match. Download CORRUPTED" << std::endl;
 		return;
 	}
-
-
-	return;	
-	
 }
 
 void handle_UP(int fd, std::string arg){
-	std::string filename = arg;
+	/* This is the client side implementation of the UP command.
+	 * basically, should allow the server to get uploaded file */
+	std::string filename = get_arg(arg);
 	std::ifstream ifs;
 	ifs.open(filename);
 	short int check;

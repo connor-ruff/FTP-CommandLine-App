@@ -126,10 +126,10 @@ void * getCliMsg(int cliFD){
     int received;
 
     bzero(&buf, sizeof(buf));
-	
     received = recv(cliFD, buf, BUFSIZ, 0);
+	
 
-    std::cout << "BUFFER: " << buf << std::endl;
+    std::cout << "BUFFER: " << buf  << " length: " << received << std::endl;
 
     if(received == -1) {
 		std::cerr << "Server failed on recv(): " << std::endl;
@@ -149,14 +149,15 @@ void directUser(int cliFD) {
 	while (true) {	
 
 		char * msg = (char *)getCliMsg(cliFD) ;
-                std::cout << "MESSAGE: " << msg << std::endl;
+        std::cout << "MESSAGE: " << msg << std::endl;
 
 		if(!strcmp(msg,"DN")) {
 
-			// std::cout << "Got DN" << std::endl;
+			std::cout << "Got DN" << std::endl;
 
 			char * fileToDownload = (char * ) getCliMsg(cliFD);
 			downloadFile(fileToDownload, cliFD);
+			usleep(100); // USELESS?
  
 		 } else if(!strcmp(msg, "UP")) {
 
@@ -245,10 +246,9 @@ size_t sendToCli(void * toSend, int len, int cliFD){
 }
 
 void downloadFile(char * filey, int cliFD){
+	// THIS is the server side implementation of the DN
 	std::string filename = filey; 
-	//std::ifstream ifs;
-        FILE *fd = fopen(filey, "rb");
-	//ifs.open(filename);
+    FILE *fd = fopen(filey, "rb");
 	int check ;
 	if (!fd){
 		std::cout << "File Not Found" << std::endl;
@@ -267,10 +267,10 @@ void downloadFile(char * filey, int cliFD){
 	sendToCli( (void *)&check, sizeof(int), cliFD);
 
 	// Get md5Sum and send to client
-        char mdsum [40] = "md5sum ";
-        strcat(mdsum, filename.c_str());
+    char mdsum[40] = "md5sum ";
+    strcat(mdsum, filename.c_str());
 	FILE * fsum = popen(mdsum, "r");
-	char md5sumOutput [50] ;
+	char md5sumOutput[50];
 	fgets(md5sumOutput, 50, fsum);
 	
 	char * hash = strtok(md5sumOutput, " ");
@@ -278,40 +278,32 @@ void downloadFile(char * filey, int cliFD){
 	sendToCli( (void *)hash, strlen(hash)+1 , cliFD) ;
 	
 	char buf[BUFSIZ];
-        size_t siz;
-        size_t ck;
-        size_t num;
+    size_t siz;
+    size_t ck;
+    size_t num;
 
 	if(check > 0){
-            bzero(&buf, BUFSIZ);
             do {
-                if(check < sizeof(buf)) {
+				bzero(&buf, BUFSIZ);
+                if(check < BUFSIZ) {
                     num = check;
                 } else {
-                    num = sizeof(buf);
+                    num = BUFSIZ;
                 }
 
                 num = fread(buf, 1, num, fd);
-                ck = (size_t)strlen(buf);
 
-                sendToCli((void *)ck, sizeof(size_t), cliFD);
 
-                if(num < 1) {
-                    std::cout << "NUM" << std::endl;
+                if(num < 1)
                     break;
-                }
-                if(!(siz = sendToCli((void *)buf, strlen(buf), cliFD))) {
-                    std::cout << "SEND" << std::endl;
+              
+                if(!(siz = sendToCli((void *)buf, num, cliFD))) 
                     break;
-                } else { 
-                    std::cout << "SIZE " << strlen(buf) << std::endl;
-                }
                 check -= num;
             }
             while (check > 0);
         }
 	
-        std::cout << "END OF DOWNLOAD" << std::endl;
 
 	fclose(fd);
 
