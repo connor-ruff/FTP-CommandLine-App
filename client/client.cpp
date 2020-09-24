@@ -149,6 +149,8 @@ void handle_UP(int servFD, std::string arg){
 	}
 	// send notice we intend to upload
 	send(servFD, "UP", strlen("UP") + 1, 0);
+	// Send length of filename
+	//send(servFD, filename.c_str()
 	// Send filename
 	send(servFD, filename.c_str(), strlen(filename.c_str())+1, 0);
 
@@ -157,11 +159,13 @@ void handle_UP(int servFD, std::string arg){
 	if ((stat(filename.c_str(), &stat_file)) == -1){
 		std::cerr << "Error on Stat: " << strerror(errno) << std::endl;
 	}
-	usleep(10000);
+	usleep(1000000);
 	check = stat_file.st_size;
-	send(servFD, (void *)&check, sizeof(int), 0);
+	size_t sent_check = send(servFD, (void *)&check, sizeof(int), 0);
+	if (sent_check == -1)
+		std::cerr <<"Ending Info To Client: " << strerror(errno) << std::endl;
 	std::cout << "File size sent with value " << check << std::endl;
-
+	std::cout << "Sent check: " << sent_check << std::endl;
 	// Get md5Sum for later
 	char mdsum[40] = "md5sum ";
 	strcat(mdsum, filename.c_str());

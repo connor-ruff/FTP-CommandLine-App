@@ -165,6 +165,7 @@ void directUser(int cliFD) {
 			std::cout << "upload" << std::endl;
 			char *fileToUpload = (char * ) getCliMsg(cliFD);
 			uploadFile(fileToUpload, cliFD);
+			usleep(1000);
 
 		 } else if(!strcmp(msg, "HEAD")) {
 
