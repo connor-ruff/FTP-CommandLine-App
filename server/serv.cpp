@@ -22,7 +22,7 @@
 char * parseArgs(int, char **);
 int getSock(std::string);
 void directUser(int);
-void * getCliMsg(int);
+void * getCliMsg(int, int);
 void listing(int);
 size_t sendToCli(void *, int, int);
 void downloadFile(char *, int);
@@ -121,16 +121,16 @@ int getSock(std::string port){
 	return sockfd;
 }
 
-void * getCliMsg(int cliFD){
+void * getCliMsg(int cliFD, int recSize){
 
     char buf[BUFSIZ];
     int received;
 
     bzero(&buf, sizeof(buf));
-    received = recv(cliFD, buf, BUFSIZ, 0);
+    received = recv(cliFD, buf, recSize, 0);
 	
 
-    std::cout << "BUFFER: " << buf  << " length: " << received << std::endl;
+    //std::cout << "BUFFER: " << buf  << " length: " << received << std::endl;
 
     if(received == -1) {
 		std::cerr << "Server failed on recv(): " << std::endl;
@@ -147,71 +147,91 @@ void * getCliMsg(int cliFD){
 
 void directUser(int cliFD) {
 
+	int comm = 0;
 	while (true) {	
 
-		char * msg = (char *)getCliMsg(cliFD) ;
-        std::cout << "MESSAGE: " << msg << std::endl;
+		comm = *((int *)getCliMsg(cliFD, sizeof(int))) ;
 
-		if(!strcmp(msg,"DN")) {
+		switch(comm) {
+			case 1: { 
 
-			std::cout << "Got DN" << std::endl;
+				std::cout << "Got DN" << std::endl;
+			
+				short int filenameSize = *((short int *) getCliMsg(cliFD, sizeof(short int)));
+			//	std::cout << "FileName Size: " << filenameSize << std::endl;
+				
+				char * fileToDownload = (char * ) getCliMsg(cliFD, (int) filenameSize);
+		//		std::cout << "FileName: " << fileToDownload << std::endl;
+				downloadFile(fileToDownload, cliFD);
+			}
+				break;
+			
+	 
+			case 2: {
 
-			char * fileToDownload = (char * ) getCliMsg(cliFD);
-			downloadFile(fileToDownload, cliFD);
-			usleep(100); // USELESS?
- 
-		 } else if(!strcmp(msg, "UP")) {
+				std::cout << "upload" << std::endl;
+				short int filenameSize = *((short int *) getCliMsg(cliFD, sizeof(short int)));
+				std::cout << "Size of Filename: " << filenameSize << std::endl;
+				char *fileToUpload = (char * ) getCliMsg(cliFD, (int)filenameSize); // TODO
+				std::cout << "File: " << fileToUpload << std::endl;
+				uploadFile(fileToUpload, cliFD);
+			}
+				break;
 
-			std::cout << "upload" << std::endl;
-			char *fileToUpload = (char * ) getCliMsg(cliFD);
-			uploadFile(fileToUpload, cliFD);
-			usleep(1000);
+			case 3: {
+				std::cout << "head" << std::endl;
+				char * fileToGet = (char *)getCliMsg(cliFD, BUFSIZ); // TODO
+				std::cout << fileToGet << std::endl;
+			}
+				break;
 
-		 } else if(!strcmp(msg, "HEAD")) {
+			case 4: {
+				std::cout << "rm" << std::endl;
+				char * fileToRem = (char *)getCliMsg(cliFD, BUFSIZ); //TODO
+				std::cout << fileToRem << std::endl;
+			}
+				break;
 
-			std::cout << "head" << std::endl;
-			char * fileToGet = (char *)getCliMsg(cliFD);
-			std::cout << fileToGet << std::endl;
+			case 5: {
+				std::cout << "ls" << std::endl;
+				listing(cliFD);
+			}
+				break;
 
-		} else if(!strcmp(msg, "RM")) {
+			case 6: {
+				std::cout << "mkdir" << std::endl;
+				char * dirName = (char *)getCliMsg(cliFD, BUFSIZ); // TODO
+			    std::cout << dirName << std::endl;
+			}
+				break;
 
-			std::cout << "rm" << std::endl;
-			char * fileToRem = (char *)getCliMsg(cliFD);
-			std::cout << fileToRem << std::endl;
+			case 7: {
+				std::cout << "rmdir" << std::endl;
+				char * dirName = (char *)getCliMsg(cliFD, BUFSIZ); // TODO
+				std::cout << dirName << std::endl;
+			}
+				break;
 
-		} else if(!strcmp(msg, "LS")) {
-
-			std::cout << "ls" << std::endl;
-			listing(cliFD);
-
-		} else if(!strcmp(msg, "MKDIR")) {
-
-			std::cout << "mkdir" << std::endl;
-			char * dirName = (char *)getCliMsg(cliFD);
-			std::cout << dirName << std::endl;
-
-		} else if(!strcmp(msg, "RMDIR")) {
-
-			std::cout << "rmdir" << std::endl;
-			char * dirName = (char *)getCliMsg(cliFD);
-			std::cout << dirName << std::endl;
-
-		} else if(!strcmp(msg, "CD")) {
-
-			std::cout << "cd" << std::endl;
+			case 8: {
+				std::cout << "cd" << std::endl;
+			}
+				break;
 
 
-		} else if(!strcmp(msg, "QUIT")) {
+			case 9: {
+				std::cout << "quit" << std::endl;
+				std::exit(0);
+			}
+			case 0: 
+				break;
 
-			std::cout << "quit" << std::endl;
-                        break;
+			default: {
+				std::cerr << "Command not recognized: " << std::endl;
+			}
+				break;
+		}
 
-		 } else {
-
-			std::cerr << "Command not recognized: " << std::endl;
-                        break;
-
-		 }
+		 
 
 	}
 } 
@@ -320,17 +340,17 @@ void uploadFile(char * filey, int cliFD){
 	char buffer[BUFSIZ];
 	//usleep(100); //TODO check if matters
 	// recieve the name of the file we are getting
-	std::cout << "We are receiving the file: " << filey << std::endl;
 
 	// Recieve the size of the file
 	// possible endianness issues?
 	int fileSize = 0;
-	read(cliFD, (int *)&fileSize, sizeof(fileSize));
+	read(cliFD, (int *)&fileSize, sizeof(int));
 	std::cout << "Filesize: " << fileSize << std::endl;
 
 
-	// Acknowledge that we are ready to recieve
-	send(cliFD, "READY", strlen("READY")+1, 0);
+	// Acknowledge that we are ready to recieve with a 1
+	int readyCode = 1;
+	send(cliFD, (void *)&readyCode, sizeof(int), 0);
 
 	// Start calculating time
 	struct timeval b4;

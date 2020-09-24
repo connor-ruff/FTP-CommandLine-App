@@ -52,12 +52,19 @@ void handle_DN(int fd, std::string command){
 	int valread;
 	char buffer[BUFSIZ];
 	std::string arg = get_arg(command);
-	send(fd, (char *)"DN", strlen("DN")+1, 0);
-	usleep(100); // TODO This might not be neccessary but it seemed like things where sending too fast and it was causing bugs for me
+	int code = 1;
+	send(fd, (void *)&code, sizeof(int), 0);  // 0 = code for "download" command
+
+	// usleep(100); // TODO This might not be neccessary but it seemed like things where sending too fast and it was causing bugs for me
+	
+	// Send Size of Fucking FIl;ename
+	short int nameSiz = arg.length();
+	send(fd, (void *)&nameSiz, sizeof(short int), 0);
+
 	// Send over the command
-	std::cout << "arg is " << arg << std::endl;
+//	std::cout << "arg is " << arg << std::endl;
 	send(fd, arg.c_str(), strlen(arg.c_str())+1, 0);
-	std::cout << "Sent over the command\n";
+//	std::cout << "Sent over the command\n";
 	
 	
 	// Recieve the size of the file
@@ -68,13 +75,13 @@ void handle_DN(int fd, std::string command){
 		std::cout << "No file found at " << arg << std::endl;
 		return;
 	}
-	std::cout << "Filesize: " << fileSize << std::endl; //TODO	
+//	std::cout << "Filesize: " << fileSize << std::endl; //TODO	
 	//Read in the md5hash
 	valread = read(fd, buffer, BUFSIZ);
 	buffer[valread] = '\0';
 	std::string md5sum = buffer;
 
-	std::cout << "Hash From Serv: " << md5sum << "  (size: " << md5sum.size() << ")." <<  std::endl; //TODO
+//	std::cout << "Hash From Serv: " << md5sum << "  (size: " << md5sum.size() << ")." <<  std::endl; //TODO
 
 
 	
@@ -96,7 +103,7 @@ void handle_DN(int fd, std::string command){
 
 	FILE * wf = fopen(arg.c_str(), "wb"); // where to store file
 
-	std::cout << "Recieving File.... " << std::endl << std::endl;
+//	std::cout << "Recieving File.... " << std::endl << std::endl;
 	while( totalSent < fileSize ){
 		valread = recv(fd, buffer, sizey, 0);
 		totalSent += valread;
@@ -139,6 +146,7 @@ void handle_UP(int servFD, std::string arg){
 	/* This is the client side implementation of the UP command.
 	 * basically, should allow the server to get uploaded file */
 	std::string filename = get_arg(arg);
+
 	FILE *fd = fopen(filename.c_str(), "rb");
 	int check;
 	if(!fd){
@@ -148,9 +156,15 @@ void handle_UP(int servFD, std::string arg){
 		return;
 	}
 	// send notice we intend to upload
-	send(servFD, "UP", strlen("UP") + 1, 0);
+	int comCode = 2;
+	send(servFD, (void *)&comCode, sizeof(int), 0);
 	// Send length of filename
 	//send(servFD, filename.c_str()
+	
+
+	// Send size of filename
+	short int fileLen = (short int) filename.length();
+	send(servFD, (void *)&fileLen, sizeof(short int), 0);
 	// Send filename
 	send(servFD, filename.c_str(), strlen(filename.c_str())+1, 0);
 
@@ -159,7 +173,6 @@ void handle_UP(int servFD, std::string arg){
 	if ((stat(filename.c_str(), &stat_file)) == -1){
 		std::cerr << "Error on Stat: " << strerror(errno) << std::endl;
 	}
-	usleep(1000000);
 	check = stat_file.st_size;
 	size_t sent_check = send(servFD, (void *)&check, sizeof(int), 0);
 	if (sent_check == -1)
@@ -176,10 +189,12 @@ void handle_UP(int servFD, std::string arg){
 	char * hash = strtok(md5sumOutput, " ");
 
 	// recieve acknowlegement
+	int reccode = 0;
+	while (reccode != 1)
+		read(servFD, (void *)&reccode, sizeof(0));
+	
+
 	char buf[BUFSIZ];
-	read(servFD, buf, BUFSIZ);
-
-
 	size_t num;
 	do {
 		bzero(&buf, BUFSIZ);
