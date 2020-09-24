@@ -63,7 +63,7 @@ void handle_DN(int fd, std::string command){
 	// Recieve the size of the file
 	// This might give us endian probs
 	int fileSize;
-	valread = read(fd, (int *)&fileSize, sizeof(fileSize));
+	valread = read(fd, (int *)&fileSize, sizeof(int));
 	if (fileSize == -1){
 		std::cout << "No file found at " << arg << std::endl;
 		return;
@@ -135,50 +135,81 @@ void handle_DN(int fd, std::string command){
 	}
 }
 
-void handle_UP(int fd, std::string arg){
+void handle_UP(int servFD, std::string arg){
 	/* This is the client side implementation of the UP command.
 	 * basically, should allow the server to get uploaded file */
 	std::string filename = get_arg(arg);
-	std::ifstream ifs;
-	ifs.open(filename);
-	short int check;
-	if(!ifs){
+	FILE *fd = fopen(filename.c_str(), "rb");
+	int check;
+	if(!fd){
 		std::cout << "File Not Found" << std::endl;
-		check = -1;
-		send(fd, (void *)&check, sizeof(check), 0);
+		//check = -1;
+		//send(servFD, (void *)&check, sizeof(check), 0);
 		return;
 	}
+	// send notice we intend to upload
+	send(servFD, "UP", strlen("UP") + 1, 0);
+	// Send filename
+	send(servFD, filename.c_str(), strlen(filename.c_str())+1, 0);
+
 	// Send file size
 	struct stat stat_file;
-	if( (stat(filename.c_str(), &stat_file)) == -1){
+	if ((stat(filename.c_str(), &stat_file)) == -1){
 		std::cerr << "Error on Stat: " << strerror(errno) << std::endl;
 	}
-
+	usleep(10000);
 	check = stat_file.st_size;
-	send(fd, (void *)&check, sizeof(short int), 0);
+	send(servFD, (void *)&check, sizeof(int), 0);
+	std::cout << "File size sent with value " << check << std::endl;
 
-	// Get md5Sum and send to client
+	// Get md5Sum for later
 	char mdsum[40] = "md5sum ";
 	strcat(mdsum, filename.c_str());
-	FILE* fileFd = popen(mdsum, "r");
+	FILE* fsum= popen(mdsum, "r");
 	char md5sumOutput [50];
-	fgets(md5sumOutput, 50, fileFd);
-
+	fgets(md5sumOutput, 50, fsum);
+	pclose(fsum);
 	char * hash = strtok(md5sumOutput, " ");
-	send(fd, (void *)hash, strlen(hash)+1, 0);
 
+	// recieve acknowlegement
 	char buf[BUFSIZ];
-	bzero(&buf, BUFSIZ);
-	size_t siz;
+	read(servFD, buf, BUFSIZ);
 
-	while (ifs.peek() != EOF){
-		ifs.read(buf, BUFSIZ);
-		std::cout << buf << std::endl;
-		siz = send(fd, (void *)buf, strlen(buf), 0);
+
+	size_t num;
+	do {
+		bzero(&buf, BUFSIZ);
+		if (check < BUFSIZ) {
+			num = check;
+		} else {
+			num = BUFSIZ;
+		}
+
+		num = fread(buf, 1, num, fd);
+		if (num < 1)
+			break;
+		if(!send(servFD, (void *)buf, num, 0))
+			break;
+		check -= num;
 	}
-	ifs.close();
+	while (check > 0);
+	
+	fclose(fd);
 
-	return;
+	// Recieve the throughput
+	float throughPut;
+	read(servFD, (float *)&throughPut, sizeof(throughPut));
+	std::cout << throughPut << " bits/sec" << std::endl;
+	int valread;
+	// recieve the hash
+	valread = read(servFD, buf, BUFSIZ);
+	buf[valread] = '\0';
+	std::cout << "server hash is " << buf << std::endl;
+	std::cout << "client hash is " << hash << std::endl;
+	if(!strcmp(buf, hash))
+		std::cout << "Hashes match!" << std::endl;
+	else
+		std::cout << "Hashes do not match, CORRUPTED\n";
 }
 
 

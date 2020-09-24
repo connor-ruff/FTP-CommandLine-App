@@ -7,6 +7,7 @@
 #include<string.h>
 #include<sys/types.h>
 #include<sys/socket.h>
+#include<sys/time.h>
 #include<netinet/in.h>
 #include<netdb.h>
 #include<cstdlib>
@@ -259,7 +260,7 @@ void downloadFile(char * filey, int cliFD){
    
 
 	// Send file size
-        struct stat stat_file;
+    struct stat stat_file;
 	if (    (stat(filename.c_str(), &stat_file)) == -1 ){
 		std::cerr << "Error on Stat: " << strerror(errno) << std::endl;
 	}
@@ -279,7 +280,6 @@ void downloadFile(char * filey, int cliFD){
 	
 	char buf[BUFSIZ];
     size_t siz;
-    size_t ck;
     size_t num;
 
 	if(check > 0){
@@ -313,82 +313,68 @@ void downloadFile(char * filey, int cliFD){
 
 
 void uploadFile(char * filey, int cliFD){
-	/*
-        std::string filename = filey; 
-	std::ofstream ofs (filename);
-	ifs.open(filename);
-        short int check;
-	if (!ifs){
-		std::cout << "File Not Made" << std::endl;
-                check = -1;
-		return;
-	} 
+/* Server side implementation of UP */
+	std::string filey_str = filey;
+	int valread;
+	char buffer[BUFSIZ];
+	//usleep(100); //TODO check if matters
+	// recieve the name of the file we are getting
+	std::cout << "We are receiving the file: " << filey << std::endl;
 
-        // acknowledge ready to recieve
-        sendToCli((void *)check, sizeof(check), cliFD);
+	// Recieve the size of the file
+	// possible endianness issues?
+	int fileSize = 0;
+	read(cliFD, (int *)&fileSize, sizeof(fileSize));
+	std::cout << "Filesize: " << fileSize << std::endl;
 
-        // get size of file
-        short int fileSize;
-	valread = read(fd, (int *)&fileSize, sizeof(fileSize));
-	if (fileSize == -1){
-		return;
+
+	// Acknowledge that we are ready to recieve
+	send(cliFD, "READY", strlen("READY")+1, 0);
+
+	// Start calculating time
+	struct timeval b4;
+	gettimeofday(&b4, NULL);
+
+	// Manipulate recive max based on filesize
+	size_t sizey;
+	if (fileSize > BUFSIZ)
+		sizey = BUFSIZ;
+	else 
+		sizey = fileSize;
+	int totalSent = 0;
+	std::cout << "filey b4 fopen " << filey << std::endl;
+	FILE *wf = fopen(filey, "wb");
+	std::cout << "Recieving File... " << std::endl << std::endl;
+	while (totalSent < fileSize) {
+		valread = recv(cliFD, buffer, sizey, 0);
+		totalSent += valread;
+		fwrite(buffer, 1, valread, wf);
+		bzero(&buffer, sizeof(buffer));
 	}
 
-        char buffer[BUFSIZ];
-        int totalSent = 0;
-	bzero( &buffer, sizeof(buffer));
-	while( (valread	= recv(fd, buffer, fileSize, 0))  > 0 ){
-		totalSent += valread ;
-		ofs << buffer;
-		bzero( &buffer, sizeof(buffer));
-		if ( totalSent >= fileSize ) {
-			break;
-		}
+	struct timeval after;
+	gettimeofday(&after, NULL);
+	fclose(wf);
+	float elapsedTime = (((after.tv_sec - b4.tv_sec) * 1000000) + (after.tv_usec - b4.tv_usec));
+	float throughPut = ((fileSize * 8)) / (elapsedTime / 1000000);
+	// Send the throughput,
+	send(cliFD, (void *)&throughPut, sizeof(throughPut), 0);
 
-        }
+	// Send the hash
+	std::cout << "Entering hash section" << std::endl;
+	char md5sum[40] = "md5sum ";
+	std::cout << "filey_str " << filey_str << std::endl;
+	strcat(md5sum, filey_str.c_str());
+	std::cout << md5sum << std::endl;
+	FILE *dfile = popen(md5sum, "r");
+	char md5sumOutput[50];
+	fgets(md5sumOutput, 50, dfile);
+	pclose(dfile);
 
-
-
-
-
-
-
-   
-
-	// Send file size
-    struct stat stat_file;
-	if (    (stat(filename.c_str(), &stat_file)) == -1 ){
-		std::cerr << "Error on Stat: " << strerror(errno) << std::endl;
-	}
-	check = stat_file.st_size;
-	std::cout << "File Inode: " << stat_file.st_ino << std::endl;
-	std::cout << "Sending file size: " << stat_file.st_size << std::endl;
-	sendToCli( (void *)&check, sizeof(short int), cliFD);
-
-	// Get md5Sum and send to client
-    char mdsum [40] = "md5sum ";
-    strcat(mdsum, filename.c_str());
-	FILE * fd = popen(mdsum, "r");
-	char md5sumOutput [30] ;
-	fgets(md5sumOutput, 30, fd);
-	
-	char * hash = strtok(md5sumOutput, " ");
-
-	std::cout << "Sending hash: " << hash << std::endl;
-	sendToCli( (void *)hash, strlen(hash)+1 , cliFD) ;
-
-
-		
-	char buf[BUFSIZ];
-	while( ifs.peek() != EOF){
-		ifs.read(buf, BUFSIZ);
-                printf("%s", buf);
-		sendToCli((void *)buf, strlen(buf)+1, cliFD);
-                bzero(&buf, sizeof(buf));
-	}
-
-	ifs.close(); */
-
+	std::cout << "pre strtok " << md5sumOutput << std::endl;
+	char *hash = strtok(md5sumOutput, " ");
+	std::cout << "hash is: "<< hash << std::endl;
+	send(cliFD, hash, strlen(hash) + 1, 0);
 } 
 
 
