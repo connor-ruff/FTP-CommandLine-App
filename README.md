@@ -1,6 +1,8 @@
-# ProgAssign2
+# FTP Command Line Application
 
-Team Members:
+Both Clients and Servers
+
+Contributors:
 	- Connor Ruff
 	- Kelly Buchanan
 	- Ryan Wigglesworth
