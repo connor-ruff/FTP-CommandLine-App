@@ -1,4 +1,6 @@
-
+// Connor Ruff - cruff
+// Kelly Buchanan - kbuchana
+// Ryan Wigglesworth - rwiggles
 #include<string>
 #include<iostream>
 #include<dirent.h>
@@ -47,6 +49,8 @@ int main(int argc, char ** argv){
 	int cliFD;
 	struct sockaddr_in cliAddr;
 	int addr_len = sizeof(cliAddr);
+
+	// Continuously Search For Connections
 	while (true){
                 std::cout << "Waiting for connection on port " << port << "...\n" ;
 		if ( (cliFD = accept(sockfd, (struct sockaddr *)&cliAddr, (socklen_t *) &addr_len)) < 0){
@@ -58,7 +62,7 @@ int main(int argc, char ** argv){
 
                 }
 
-		// Recieve information
+		// Send New Connection to User Directory
 		directUser(cliFD); 
 	}
 
@@ -133,9 +137,6 @@ void * getCliMsg(int cliFD, int recSize){
 
     bzero(&buf, sizeof(buf));
     received = recv(cliFD, buf, recSize, 0);
-//	std::cout << "Recieved " << received << " bytes from client" << std::endl; // TODO	
-
-  //  std::cout << "BUFFER: " << buf  << " length: " << received << std::endl;
 
     if(received == -1) {
 		std::cerr << "Server failed on recv(): " << std::endl;
@@ -155,6 +156,7 @@ void directUser(int cliFD) {
 	int comm = 0;
 	while (true) {	
 
+		// Get Command From User (Encoded via int's)
 		comm = *((int *)getCliMsg(cliFD, sizeof(int))) ;
 
 		switch(comm) {
@@ -183,7 +185,6 @@ void directUser(int cliFD) {
 				break;
 
 			case 4: {
-				std::cout << "rm" << std::endl;
 				short int filenameSize = *((short int *) getCliMsg(cliFD, sizeof(short int)));
 				char * fileToRem = (char *)getCliMsg(cliFD, (int)filenameSize); // TODO
 				remFile(cliFD, fileToRem);
@@ -356,12 +357,11 @@ size_t sendToCli(void * toSend, int len, int cliFD){
 
 void downloadFile(char * filey, int cliFD){
 	// THIS is the server side implementation of the DN
-	std::string filename = filey; 
+//	std::string filename = filey; 
     FILE *fd = fopen(filey, "rb");
 	int check ;
 
 	if (!fd){
-		std::cout << "File Not Found" << std::endl;
 		check = -1;
 		sendToCli( (void *)&check, sizeof(int), cliFD);
 		return;
@@ -370,7 +370,7 @@ void downloadFile(char * filey, int cliFD){
 
 	// Send file size
     struct stat stat_file;
-	if (    (stat(filename.c_str(), &stat_file)) == -1 ){
+	if (    (stat(filey, &stat_file)) == -1 ){
 		std::cerr << "Error on Stat: " << strerror(errno) << std::endl;
 	}
 	check = stat_file.st_size;
@@ -378,13 +378,12 @@ void downloadFile(char * filey, int cliFD){
 
 	// Get md5Sum and send to client
     char mdsum[40] = "md5sum ";
-    strcat(mdsum, filename.c_str());
+    strcat(mdsum, filey);
 	FILE * fsum = popen(mdsum, "r");
 	char md5sumOutput[50];
 	fgets(md5sumOutput, 50, fsum);
 	
 	char * hash = strtok(md5sumOutput, " ");
-
 	sendToCli( (void *)hash, strlen(hash)+1 , cliFD) ;
 	
 	char buf[BUFSIZ];
@@ -415,6 +414,7 @@ void downloadFile(char * filey, int cliFD){
 	
 
 	fclose(fd);
+	pclose(fsum);
 
 	return;
 
@@ -429,11 +429,11 @@ void uploadFile(char * filey, int cliFD){
 
 	// Recieve the size of the file
 	int fileSize = 0;
-	read(cliFD, (int *)&fileSize, sizeof(int));
+	fileSize = *( (int *)getCliMsg(cliFD, sizeof(int)));
 
 	// Acknowledge that we are ready to recieve with a 1
 	int readyCode = 1;
-	send(cliFD, (void *)&readyCode, sizeof(int), 0);
+	sendToCli( (void *)&readyCode, sizeof(int), cliFD);
 
 	// Start calculating time
 	struct timeval b4;
@@ -460,19 +460,18 @@ void uploadFile(char * filey, int cliFD){
 	float elapsedTime = (((after.tv_sec - b4.tv_sec) * 1000000) + (after.tv_usec - b4.tv_usec));
 	float throughPut = ((fileSize * 8)) / (elapsedTime / 1000000);
 	// Send the throughput,
-	send(cliFD, (void *)&throughPut, sizeof(throughPut), 0);
+	sendToCli( (void *)&throughPut, sizeof(throughPut), cliFD) ;
 
 	// Send the hash
 	char md5sum[40] = "md5sum ";
 	strcat(md5sum, filey_str.c_str());
-	std::cout << md5sum << std::endl;
 	FILE *dfile = popen(md5sum, "r");
 	char md5sumOutput[50];
 	fgets(md5sumOutput, 50, dfile);
 	pclose(dfile);
 
 	char *hash = strtok(md5sumOutput, " ");
-	send(cliFD, hash, strlen(hash) + 1, 0);
+	sendToCli(hash, strlen(hash)+1, cliFD);
 } 
 
 
@@ -486,7 +485,6 @@ void getHead(char * filey, int cliFD){
 	FILE *fd = fopen(filey, "rb");
 	int check;
 	if(!fd){
-		std::cout << "File Not Found" << std::endl;
 		check = -1;
 		send(cliFD, (void *)&check, sizeof(check), 0);
 		return;
@@ -497,7 +495,6 @@ void getHead(char * filey, int cliFD){
 	char out[BUFSIZ];
 	fread(out, 1, BUFSIZ, fhead);
 	pclose(fhead);
-	std::cout << "strlen head " << out << std::endl;
 	// send return size
 	check = strlen(out) + 1;
 	send(cliFD, (void *)&check, sizeof(int), 0);

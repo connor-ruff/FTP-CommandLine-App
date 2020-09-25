@@ -1,3 +1,6 @@
+// Connor Ruff - cruff
+// Kelly Buchanan - kbuchana
+// Ryan Wigglesworth - rwiggles
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -46,6 +49,35 @@ int get_socket(){
 
 }
 
+size_t sendToServ(int fd, void * toSend, int len) {
+
+	size_t sent = send(fd, toSend, len, 0);
+	if ( sent == -1 ){
+		std::cerr << "Error Sending Info To Client: " << strerror(errno) << std::endl;
+		std::exit(-1);
+	}
+
+	return sent;
+
+}
+
+void * getServMsg(int fd, int len) {
+
+	char buf[BUFSIZ];
+	int rec;
+
+	bzero(&buf, sizeof(buf));
+	rec = recv(fd, buf, len, 0);
+
+	if (rec == -1 ){
+		std::cerr << "Client Failed on recv(): " << strerror(errno) << std::endl;
+		std::exit(-1);
+	}
+	buf[rec] = '\0';
+
+	void * ret = buf;
+	return ret;
+}
 
 void handle_DN(int fd, std::string command){
 /* Client Side implementation of the DN request */
@@ -53,38 +85,37 @@ void handle_DN(int fd, std::string command){
 	char buffer[BUFSIZ];
 	std::string arg = get_arg(command);
 	int code = 1;
-	send(fd, (void *)&code, sizeof(int), 0);  // 0 = code for "download" command
-
-	// usleep(100); // TODO This might not be neccessary but it seemed like things where sending too fast and it was causing bugs for me
+	sendToServ(fd, (void *)&code, sizeof(int));  // 1 = code for "download" command
 	
 	// Send Size of Fucking FIl;ename
-	short int nameSiz = arg.length();
-	send(fd, (void *)&nameSiz, sizeof(short int), 0);
+	short int nameSiz = arg.length() + 1;
+	sendToServ(fd, (void *)&nameSiz, sizeof(short int));
 
-	// Send over the command
-//	std::cout << "arg is " << arg << std::endl;
-	send(fd, arg.c_str(), strlen(arg.c_str())+1, 0);
-//	std::cout << "Sent over the command\n";
-	
+	// Send over the filename
+	sendToServ(fd, (void *) arg.c_str(), nameSiz);
 	
 	// Recieve the size of the file
-	// This might give us endian probs
 	int fileSize;
-	valread = read(fd, (int *)&fileSize, sizeof(int));
+	if (  ( valread = read(fd, (int *)&fileSize, sizeof(int))) == -1){
+		std::cerr << "Failure on read(): " << strerror(errno) << std::endl;
+		std::exit(-1);
+	}
+
+	// Check If Server Sent Error Indicator
 	if (fileSize == -1){
 		std::cout << "No file found at " << arg << std::endl;
 		return;
 	}
-//	std::cout << "Filesize: " << fileSize << std::endl; //TODO	
+
 	//Read in the md5hash
-	valread = read(fd, buffer, BUFSIZ);
+	if (   (valread = read(fd, buffer, 33)) == -1 ) {
+		std::cerr << "Failure on read(): " << strerror(errno) << std::endl;
+		std::exit(-1);
+	}
+
 	buffer[valread] = '\0';
-	std::string md5sum = buffer;
+	std::string md5sum = std::string(buffer);
 
-//	std::cout << "Hash From Serv: " << md5sum << "  (size: " << md5sum.size() << ")." <<  std::endl; //TODO
-
-
-	
 	int totalSent = 0;
 	bzero( &buffer, sizeof(buffer));
 	// Start Calculating time
@@ -103,7 +134,6 @@ void handle_DN(int fd, std::string command){
 
 	FILE * wf = fopen(arg.c_str(), "wb"); // where to store file
 
-//	std::cout << "Recieving File.... " << std::endl << std::endl;
 	while( totalSent < fileSize ){
 		valread = recv(fd, buffer, sizey, 0);
 		totalSent += valread;
@@ -140,6 +170,8 @@ void handle_DN(int fd, std::string command){
 		std::cout << "\nERROR: Hash's do not match. Download CORRUPTED" << std::endl;
 		return;
 	}
+
+	pclose(dfile);
 }
 
 void handle_UP(int servFD, std::string arg){
@@ -151,21 +183,17 @@ void handle_UP(int servFD, std::string arg){
 	int check;
 	if(!fd){
 		std::cout << "File Not Found" << std::endl;
-		//check = -1;
-		//send(servFD, (void *)&check, sizeof(check), 0);
 		return;
 	}
 	// send notice we intend to upload
 	int comCode = 2;
-	send(servFD, (void *)&comCode, sizeof(int), 0);
-	// Send length of filename
-	//send(servFD, filename.c_str()
+	sendToServ(servFD, (void *)&comCode, sizeof(int));
 	
 	// Send size of filename
-	short int fileLen = (short int) filename.length()+1;
-	send(servFD, (void *)&fileLen, sizeof(short int), 0);
+	short int fileLen = (short int) (filename.length() + 1);
+	sendToServ(servFD, (void *)&fileLen, sizeof(short int));
 	// Send filename
-	send(servFD, filename.c_str(), strlen(filename.c_str())+1, 0);
+	sendToServ(servFD, (void *)filename.c_str(), fileLen ) ;
 
 	// Send file size
 	struct stat stat_file;
@@ -173,11 +201,10 @@ void handle_UP(int servFD, std::string arg){
 		std::cerr << "Error on Stat: " << strerror(errno) << std::endl;
 	}
 	check = stat_file.st_size;
-	size_t sent_check = send(servFD, (void *)&check, sizeof(int), 0);
+	int sizey = check;
+	size_t sent_check = sendToServ(servFD, (void *)&check, sizeof(int));
 	if (sent_check == -1)
 		std::cerr <<"Sending Info To Client: " << strerror(errno) << std::endl;
-	//std::cout << "File size sent with value " << check << std::endl;
-	//std::cout << "Sent check: " << sent_check << std::endl;
 	// Get md5Sum for later
 	char mdsum[40] = "md5sum ";
 	strcat(mdsum, filename.c_str());
@@ -214,20 +241,21 @@ void handle_UP(int servFD, std::string arg){
 	
 	fclose(fd);
 
+	std::cout << "Calculated: " << hash << std::endl;
+
 	// Recieve the throughput
 	float throughPut;
-	read(servFD, (float *)&throughPut, sizeof(throughPut));
+	throughPut = *((float *) getServMsg( servFD, sizeof(throughPut)));
+	std::cout << sizey << " bytes transferred with throughput of: " ; 
 	std::cout << throughPut << " bits/sec" << std::endl;
 	int valread;
 	// recieve the hash
-	valread = read(servFD, buf, BUFSIZ);
-	buf[valread] = '\0';
-	std::cout << "server hash is " << buf << std::endl;
-	std::cout << "client hash is " << hash << std::endl;
-	if(!strcmp(buf, hash))
-		std::cout << "Hashes match!" << std::endl;
+	char * buffer = (char *) (getServMsg(servFD, BUFSIZ));
+	std::cout << "MD5 Hash: " << buffer ;
+	if(!strcmp(buffer, hash))
+		std::cout << " (matches)" << std::endl;
 	else
-		std::cout << "Hashes do not match, CORRUPTED\n";
+		std::cout << " - Hashes do not match, CORRUPTED\n";
 }
 
 
@@ -246,8 +274,8 @@ void handle_HEAD(int servFD, std::string command){
 	short int fileLen = (short int) filename.length()+1;
 	send(servFD, (void *)&fileLen, sizeof(short int), 0);
 	// Send filename
-	send(servFD, filename.c_str(), strlen(filename.c_str())+1, 0);
-	
+	send(servFD, filename.c_str(), strlen(filename.c_str()) + 1, 0);
+
 	// Recieve the size of the file as a 32 bit int
 	// possible endian probs
 	int fileSize;
@@ -266,11 +294,10 @@ void handle_HEAD(int servFD, std::string command){
 
 
 	int totalSent = 0;
-//	std::cout << "Recieving File.... " << std::endl << std::endl;
 	while( totalSent < fileSize ){
 		valread = recv(servFD, buffer, sizey, 0);
 		totalSent += valread;
-		fwrite(buffer, 1, valread, stdout);                            
+		fwrite(buffer, 1, valread, stdout); 
 		bzero( &buffer, sizeof(buffer));
 		 if ( totalSent >= fileSize ) {
 			break;
@@ -279,41 +306,6 @@ void handle_HEAD(int servFD, std::string command){
 }
 
 
-/*void handle_RM(int fd, std::string command) {
-	int valread;
-	char buffer[BUFSIZ];
-	std::string arg = get_arg(command);
-	send(fd, (char *)"RM", 2, 0);
-
-	// send over the command
-	send(fd, arg.c_str(), strlen(arg.c_str()), 0);
-	
-	// recieve a response if file exists
-	int exists;
-	valread = read(fd, (int *)&exists, sizeof(exists));
-	if (valread != 1){
-		std::cout << "File not available to be deleted\n";
-		return;
-	}
-	// confirm user choice and send to server
-	std::cout << "Are you sure? ";
-	std::string response;
-	getline(std::cin, response);
-	send(fd, response.c_str(), strlen(response.c_str()), 0);
-
-	// handle response
-	int deleted;
-	if (response == "Yes"){
-		valread = read(fd, (int *)&deleted, sizeof(deleted));
-		if (deleted == 1)
-			std::cout << "File deleted." << std::endl;
-		else
-			std::cout << "ERROR: File not deleted." << std::endl;
-	}
-	
-
-	return;
-}*/
 
 void handle_LS(int fd, std::string input){
 
@@ -415,6 +407,7 @@ void handle_RMDIR(int fd, std::string input){
 			std::cout << "Are you sure you want to remove " << arg <<"?: (y/n) " << std::endl;
 			char in;
 			std::cin >> in;
+			std::cin.ignore();
 			if (in == 'y'){
 				int code = 1;
 				send(fd, (void *)&code, sizeof(int), 0);
@@ -462,6 +455,7 @@ void handle_RM(int fd, std::string input){
 			std::cout << "Are you sure you want to remove " << arg <<"?: (y/n) " << std::endl;
 			char in;
 			std::cin >> in;
+			std::cin.ignore();
 			if (in == 'y'){
 				int code = 1;
 				send(fd, (void *)&code, sizeof(int), 0);
@@ -496,7 +490,8 @@ int main(int argc, char* argv[]){
 		usage(EXIT_FAILURE);
 	char* serverName = argv[1];
 	int port = atoi(argv[2]);
-	
+
+	// Create Socket	
 	int fd = get_socket();
 	if (fd < 0){
 		std::cout << "Creating file descriptor failed\n";
@@ -516,7 +511,7 @@ int main(int argc, char* argv[]){
 	memcpy((void *)&servaddr.sin_addr, hp->h_addr_list[0], hp->h_length);
 
 
-	// connect
+	// connect 
 	if (connect(fd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0){
 		printf("\nConnection Failed \n");
 		return -1; //TODO add back as soon as io works
@@ -551,6 +546,8 @@ int main(int argc, char* argv[]){
                         return 0;
 		} else if (command == "MKDIR"){
 			handle_MKDIR(fd, user_input);
+		} else if ( command == ""){
+			continue;
 		}
 		else {
                     std::cout << "Command not recognized." << std::endl;
