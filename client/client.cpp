@@ -279,7 +279,7 @@ void handle_HEAD(int servFD, std::string command){
 }
 
 
-void handle_RM(int fd, std::string command) {
+/*void handle_RM(int fd, std::string command) {
 	int valread;
 	char buffer[BUFSIZ];
 	std::string arg = get_arg(command);
@@ -313,7 +313,7 @@ void handle_RM(int fd, std::string command) {
 	
 
 	return;
-}
+}*/
 
 void handle_LS(int fd, std::string input){
 
@@ -438,6 +438,53 @@ void handle_RMDIR(int fd, std::string input){
 
 }
 
+void handle_RM(int fd, std::string input){
+
+	std::string arg = get_arg(input);
+
+	// SEND RM FLAG
+	int opCode = 4;
+	send(fd, (void *)&opCode, sizeof(int), 0);
+
+	// Send size of dirName
+	short int dirSiz = arg.length()+1;
+	send(fd, (void *)&dirSiz, sizeof(short int), 0);
+	// Send DirName
+	send(fd, arg.c_str(),dirSiz, 0);
+
+	int resp;
+	recv(fd, (void *)&resp, sizeof(int), 0);
+	switch (resp){
+		case -1:
+			std::cout << "The file does not exist" << std::endl;
+			return;
+		default: {
+			std::cout << "Are you sure you want to remove " << arg <<"?: (y/n) " << std::endl;
+			char in;
+			std::cin >> in;
+			if (in == 'y'){
+				int code = 1;
+				send(fd, (void *)&code, sizeof(int), 0);
+			}
+			else {
+				int code = -1;
+				send(fd, (void *)&code, sizeof(int), 0);	
+			}
+			break;
+
+		}
+	}
+
+	recv(fd, (void *)&resp, sizeof(int), 0);
+	if (resp == 0){
+		std::cout << "File Removed" << std::endl;
+	}
+	else
+		std::cout << "File Not Remove" << std::endl;
+
+
+}
+
 
 int main(int argc, char* argv[]){
 	struct hostent *hp; // host info
@@ -498,17 +545,19 @@ int main(int argc, char* argv[]){
 		} else if (command == "CD"){
 			handle_CD(fd, user_input);
 		} else if (command == "QUIT"){
-			break;
+			int com = 9;
+                        send(fd, (void *)&com, sizeof(int), 0);
+                        close(fd);
+                        return 0;
 		} else if (command == "MKDIR"){
 			handle_MKDIR(fd, user_input);
 		}
 		else {
+                    std::cout << "Command not recognized." << std::endl;
 		}
 
-
-
-		// Recieve the response
 	}
 	close(fd);
+        return 0;
 	
 }

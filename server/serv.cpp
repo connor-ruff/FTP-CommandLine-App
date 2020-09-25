@@ -31,6 +31,7 @@ void getHead(char *, int);
 void changeDir(int, char *);
 void makeDir(int, char *);
 void remDir(int, char *);
+void remFile(int, char *);
 
 int main(int argc, char ** argv){
 
@@ -185,7 +186,7 @@ void directUser(int cliFD) {
 				std::cout << "rm" << std::endl;
 				short int filenameSize = *((short int *) getCliMsg(cliFD, sizeof(short int)));
 				char * fileToRem = (char *)getCliMsg(cliFD, (int)filenameSize); // TODO
-				// remFile(fileToRem, cliFD);
+				remFile(cliFD, fileToRem);
 			}
 				break;
 
@@ -217,8 +218,8 @@ void directUser(int cliFD) {
 
 
 			case 9: {
-				std::cout << "quit" << std::endl;
-				std::exit(0);
+				close(cliFD);
+                                return;
 			}
 			case 0: 
 				break;
@@ -233,6 +234,32 @@ void directUser(int cliFD) {
 
 	}
 }
+
+void remFile(int cliFD, char * fileName){
+
+	int ret;
+        int success;
+
+	struct stat dirList;
+	if ( (stat(fileName, &dirList)) == -1 ){
+		ret = -1;
+		send(cliFD, (void *)&ret, sizeof(int), 0);
+		return;
+	}
+	else {
+		ret = 1;
+		send(cliFD, (void *)&ret, sizeof(int), 0);
+	}
+
+	recv(cliFD, (void *)&ret, sizeof(int), 0);
+	if ( ret == 1 ) {	
+            success = remove(fileName);
+        } 
+
+	
+	send(cliFD, (void *)&success, sizeof(int), 0);
+}
+
  
 void remDir(int cliFD, char * dirName){
 
