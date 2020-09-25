@@ -154,14 +154,9 @@ void directUser(int cliFD) {
 
 		switch(comm) {
 			case 1: { 
-
-				std::cout << "Got DN" << std::endl;
-			
-				short int filenameSize = *((short int *) getCliMsg(cliFD, sizeof(short int)));
-			//	std::cout << "FileName Size: " << filenameSize << std::endl;
-				
+	
+				short int filenameSize = *((short int *) getCliMsg(cliFD, sizeof(short int)));	
 				char * fileToDownload = (char * ) getCliMsg(cliFD, (int) filenameSize);
-		//		std::cout << "FileName: " << fileToDownload << std::endl;
 				downloadFile(fileToDownload, cliFD);
 			}
 				break;
@@ -169,11 +164,8 @@ void directUser(int cliFD) {
 	 
 			case 2: {
 
-				std::cout << "upload" << std::endl;
 				short int filenameSize = *((short int *) getCliMsg(cliFD, sizeof(short int)));
-				std::cout << "Size of Filename: " << filenameSize << std::endl;
 				char *fileToUpload = (char * ) getCliMsg(cliFD, (int)filenameSize); // TODO
-				std::cout << "File: " << fileToUpload << std::endl;
 				uploadFile(fileToUpload, cliFD);
 			}
 				break;
@@ -272,6 +264,7 @@ void downloadFile(char * filey, int cliFD){
 	std::string filename = filey; 
     FILE *fd = fopen(filey, "rb");
 	int check ;
+
 	if (!fd){
 		std::cout << "File Not Found" << std::endl;
 		check = -1;
@@ -338,15 +331,10 @@ void uploadFile(char * filey, int cliFD){
 	std::string filey_str = filey;
 	int valread;
 	char buffer[BUFSIZ];
-	//usleep(100); //TODO check if matters
-	// recieve the name of the file we are getting
 
 	// Recieve the size of the file
-	// possible endianness issues?
 	int fileSize = 0;
 	read(cliFD, (int *)&fileSize, sizeof(int));
-	std::cout << "Filesize: " << fileSize << std::endl;
-
 
 	// Acknowledge that we are ready to recieve with a 1
 	int readyCode = 1;
@@ -363,9 +351,7 @@ void uploadFile(char * filey, int cliFD){
 	else 
 		sizey = fileSize;
 	int totalSent = 0;
-	std::cout << "filey b4 fopen " << filey << std::endl;
 	FILE *wf = fopen(filey, "wb");
-	std::cout << "Recieving File... " << std::endl << std::endl;
 	while (totalSent < fileSize) {
 		valread = recv(cliFD, buffer, sizey, 0);
 		totalSent += valread;
@@ -382,9 +368,7 @@ void uploadFile(char * filey, int cliFD){
 	send(cliFD, (void *)&throughPut, sizeof(throughPut), 0);
 
 	// Send the hash
-	std::cout << "Entering hash section" << std::endl;
 	char md5sum[40] = "md5sum ";
-	std::cout << "filey_str " << filey_str << std::endl;
 	strcat(md5sum, filey_str.c_str());
 	std::cout << md5sum << std::endl;
 	FILE *dfile = popen(md5sum, "r");
@@ -392,9 +376,7 @@ void uploadFile(char * filey, int cliFD){
 	fgets(md5sumOutput, 50, dfile);
 	pclose(dfile);
 
-	std::cout << "pre strtok " << md5sumOutput << std::endl;
 	char *hash = strtok(md5sumOutput, " ");
-	std::cout << "hash is: "<< hash << std::endl;
 	send(cliFD, hash, strlen(hash) + 1, 0);
 } 
 
