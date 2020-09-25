@@ -27,6 +27,7 @@ void listing(int);
 size_t sendToCli(void *, int, int);
 void downloadFile(char *, int);
 void uploadFile(char *, int);
+void getHead(char *, int);
 
 int main(int argc, char ** argv){
 
@@ -172,8 +173,10 @@ void directUser(int cliFD) {
 
 			case 3: {
 				std::cout << "head" << std::endl;
-				char * fileToGet = (char *)getCliMsg(cliFD, BUFSIZ); // TODO
+				short int filenameSize = *((short int *) getCliMsg(cliFD, sizeof(short int)));
+				char * fileToGet = (char *)getCliMsg(cliFD, (int)filenameSize); // TODO
 				std::cout << fileToGet << std::endl;
+				getHead(fileToGet, cliFD);
 			}
 				break;
 
@@ -380,6 +383,36 @@ void uploadFile(char * filey, int cliFD){
 	send(cliFD, hash, strlen(hash) + 1, 0);
 } 
 
+
+void getHead(char * filey, int cliFD){
+	/* server side implementation for HEAD.
+	 * prints first 10 lines of a file */
+
+	int valread;
+	char buffer[BUFSIZ];
+	
+	FILE *fd = fopen(filey, "rb");
+	int check;
+	if(!fd){
+		std::cout << "File Not Found" << std::endl;
+		check = -1;
+		send(cliFD, (void *)&check, sizeof(check), 0);
+		return;
+	}
+	char command[200] =  "head -10 ";
+	strcat(command, filey);
+	FILE *fhead = popen(command, "r");
+	char out[BUFSIZ];
+	fread(out, 1, BUFSIZ, fhead);
+	pclose(fhead);
+	std::cout << "strlen head " << out << std::endl;
+	// send return size
+	check = strlen(out) + 1;
+	send(cliFD, (void *)&check, sizeof(int), 0);
+	// send the head
+	send(cliFD, out, check, 0);
+
+}
 
 	
 	

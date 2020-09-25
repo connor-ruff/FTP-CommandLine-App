@@ -231,30 +231,51 @@ void handle_UP(int servFD, std::string arg){
 }
 
 
-void handle_HEAD(int fd, std::string command){
+void handle_HEAD(int servFD, std::string command){
+	/* Client side implementation of HEAD. 
+	 * prints first 10 lines of a file */
 	int valread;
 	char buffer[BUFSIZ];
-	std::string arg = get_arg(command);
-	send(fd, (char *)"HEAD", 4, 0);
-	// Send over the command
-	std::cout << arg << std::endl;
-	send(fd, arg.c_str(), strlen(arg.c_str()), 0);
+	std::string filename = get_arg(command);
+
+	// Signal that we want to do HEAD
+	int comcode = 3;
+	send(servFD, (void *)&comcode, sizeof(comcode), 0);
+
+	// send the length of the filename
+	short int fileLen = (short int) filename.length()+1;
+	send(servFD, (void *)&fileLen, sizeof(short int), 0);
+	// Send filename
+	send(servFD, filename.c_str(), strlen(filename.c_str())+1, 0);
+	
 	// Recieve the size of the file as a 32 bit int
 	// possible endian probs
 	int fileSize;
-	valread = read(fd, (int *)&fileSize, sizeof(fileSize));
-	if (fileSize == (int)-1){
-		std::cout << "No file found at " << arg << std::endl;
+	valread = read(servFD, (int *)&fileSize, sizeof(fileSize));
+	if (fileSize == -1){
+		std::cout << "No file found at " << filename << std::endl;
 		return;
 	}
-	do {
-		valread = read(fd, buffer, BUFSIZ);
-		buffer[valread] = '\0'; // redundant?
-		std::cout << buffer << std::endl;
+	// Manipulate recieve maximum based on filesize
+	size_t sizey;
+	if (fileSize > BUFSIZ){
+		sizey = BUFSIZ;
 	}
-	while (valread > 0);
+	else 
+		sizey = fileSize;
 
-	return;
+
+	int totalSent = 0;
+//	std::cout << "Recieving File.... " << std::endl << std::endl;
+	while( totalSent < fileSize ){
+		valread = recv(servFD, buffer, sizey, 0);
+		totalSent += valread;
+		fwrite(buffer, 1, valread, stdout);                            
+		bzero( &buffer, sizeof(buffer));
+		 if ( totalSent >= fileSize ) {
+			break;
+		}
+	}
 }
 
 
