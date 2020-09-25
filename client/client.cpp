@@ -315,6 +315,129 @@ void handle_RM(int fd, std::string command) {
 	return;
 }
 
+void handle_LS(int fd, std::string input){
+
+	
+	std::string arg = get_arg(input);
+
+	// Send LS Flag To Server
+	int opCode = 5;
+	send(fd, (void *)&opCode, sizeof(int), 0);
+
+	char buf[BUFSIZ];
+	int bufSiz;
+	recv(fd, (void *)&bufSiz, sizeof(int), 0);
+	recv(fd, buf, bufSiz, 0);
+	std::cout << buf << std::endl;
+}
+
+void handle_CD(int fd, std::string input){
+	std::string arg = get_arg(input);
+
+	// Send LS Flag To Server
+	int opCode = 8;
+	send(fd, (void *)&opCode, sizeof(int), 0);
+
+	// Send Size of DirName
+	short int dirSiz = arg.length() + 1;
+	send(fd, (void *)&dirSiz, sizeof(short int), 0);
+	// Send DirName
+	send(fd, arg.c_str(), dirSiz, 0);
+
+	// Get Server Response
+	int resp;
+	recv(fd, (void *)&resp, sizeof(int), 0);
+	switch (resp){
+		case -2: 
+			std::cout << "The directory does not exist on server" << std::endl;
+			break;
+		case -1:
+			std::cout << "Error in Changing Directory" << std::endl;
+			break;
+		default:
+			std::cout << "Changed current directory" << std::endl;
+	}
+			
+}
+
+void handle_MKDIR(int fd, std::string input){
+
+	std::string arg = get_arg(input);
+
+	// SEND MKDIR FLAG
+	int opCode = 6;
+	send(fd, (void *)&opCode, sizeof(int), 0);
+
+	// Send size of dirName
+	short int dirSiz = arg.length()+1;
+	send(fd, (void *)&dirSiz, sizeof(short int), 0);
+	// Send DirName
+	send(fd, arg.c_str(),dirSiz, 0);
+
+	int resp;
+	recv(fd, (void *)&resp, sizeof(int), 0);
+	switch (resp){
+		case -2: 
+			std::cout << "The directory already exists on the server" << std::endl;
+			break;
+		case -1:
+			std::cout << "Error in making directory" << std::endl;
+			break;
+		default:
+			std::cout << "The directory was successfully made" << std::endl;
+	}
+
+}
+void handle_RMDIR(int fd, std::string input){
+
+	std::string arg = get_arg(input);
+
+	// SEND RMDIR FLAG
+	int opCode = 7;
+	send(fd, (void *)&opCode, sizeof(int), 0);
+
+	// Send size of dirName
+	short int dirSiz = arg.length()+1;
+	send(fd, (void *)&dirSiz, sizeof(short int), 0);
+	// Send DirName
+	send(fd, arg.c_str(),dirSiz, 0);
+
+	int resp;
+	recv(fd, (void *)&resp, sizeof(int), 0);
+	switch (resp){
+		case -2: 
+			std::cout << "Error in removing directoy" << std::endl;
+			return;
+		case -1:
+			std::cout << "The directory does not exist" << std::endl;
+			return;
+		default: {
+			std::cout << "Are you sure you want to remove " << arg <<"?: (y/n) " << std::endl;
+			char in;
+			std::cin >> in;
+			if (in == 'y'){
+				int code = 1;
+				send(fd, (void *)&code, sizeof(int), 0);
+			}
+			else {
+				int code = -1;
+				send(fd, (void *)&code, sizeof(int), 0);	
+			}
+			break;
+
+		}
+	}
+
+	recv(fd, (void *)&resp, sizeof(int), 0);
+	if (resp == 1){
+		std::cout << "Directory Removed" << std::endl;
+	}
+	else
+		std::cout << "Directory Not Remove" << std::endl;
+
+
+}
+
 
 int main(int argc, char* argv[]){
 	struct hostent *hp; // host info
@@ -369,11 +492,17 @@ int main(int argc, char* argv[]){
 		} else if (command == "RM"){
 			handle_RM(fd, user_input);
 		} else if (command == "LS"){
+			handle_LS(fd, user_input);
 		} else if (command == "RMDIR"){
+			handle_RMDIR(fd, user_input);
 		} else if (command == "CD"){
+			handle_CD(fd, user_input);
 		} else if (command == "QUIT"){
 			break;
-		} else {
+		} else if (command == "MKDIR"){
+			handle_MKDIR(fd, user_input);
+		}
+		else {
 		}
 
 

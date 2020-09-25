@@ -28,6 +28,9 @@ size_t sendToCli(void *, int, int);
 void downloadFile(char *, int);
 void uploadFile(char *, int);
 void getHead(char *, int);
+void changeDir(int, char *);
+void makeDir(int, char *);
+void remDir(int, char *);
 
 int main(int argc, char ** argv){
 
@@ -129,9 +132,9 @@ void * getCliMsg(int cliFD, int recSize){
 
     bzero(&buf, sizeof(buf));
     received = recv(cliFD, buf, recSize, 0);
-	
+//	std::cout << "Recieved " << received << " bytes from client" << std::endl; // TODO	
 
-    //std::cout << "BUFFER: " << buf  << " length: " << received << std::endl;
+  //  std::cout << "BUFFER: " << buf  << " length: " << received << std::endl;
 
     if(received == -1) {
 		std::cerr << "Server failed on recv(): " << std::endl;
@@ -172,43 +175,43 @@ void directUser(int cliFD) {
 				break;
 
 			case 3: {
-				std::cout << "head" << std::endl;
 				short int filenameSize = *((short int *) getCliMsg(cliFD, sizeof(short int)));
 				char * fileToGet = (char *)getCliMsg(cliFD, (int)filenameSize); // TODO
-				std::cout << fileToGet << std::endl;
 				getHead(fileToGet, cliFD);
 			}
 				break;
 
 			case 4: {
 				std::cout << "rm" << std::endl;
-				char * fileToRem = (char *)getCliMsg(cliFD, BUFSIZ); //TODO
-				std::cout << fileToRem << std::endl;
+				short int filenameSize = *((short int *) getCliMsg(cliFD, sizeof(short int)));
+				char * fileToRem = (char *)getCliMsg(cliFD, (int)filenameSize); // TODO
+				// remFile(fileToRem, cliFD);
 			}
 				break;
 
 			case 5: {
-				std::cout << "ls" << std::endl;
 				listing(cliFD);
 			}
 				break;
 
 			case 6: {
-				std::cout << "mkdir" << std::endl;
-				char * dirName = (char *)getCliMsg(cliFD, BUFSIZ); // TODO
-			    std::cout << dirName << std::endl;
+				short int filenameSize = *((short int *) getCliMsg(cliFD, sizeof(short int)));
+				char * dirName = (char *)getCliMsg(cliFD, (int)filenameSize); // TODO
+				makeDir(cliFD, dirName);
 			}
 				break;
 
 			case 7: {
-				std::cout << "rmdir" << std::endl;
-				char * dirName = (char *)getCliMsg(cliFD, BUFSIZ); // TODO
-				std::cout << dirName << std::endl;
+				short int filenameSize = *((short int *) getCliMsg(cliFD, sizeof(short int)));
+				char * dirName = (char *)getCliMsg(cliFD, (int)filenameSize); // TODO
+				remDir(cliFD, dirName);
 			}
 				break;
 
 			case 8: {
-				std::cout << "cd" << std::endl;
+				short int filenameSize = *((short int *) getCliMsg(cliFD, sizeof(short int)));
+				char * dirName = (char *)getCliMsg(cliFD, (int)filenameSize); // TODO
+				changeDir(cliFD, dirName);
 			}
 				break;
 
@@ -229,25 +232,87 @@ void directUser(int cliFD) {
 		 
 
 	}
-} 
+}
+ 
+void remDir(int cliFD, char * dirName){
+
+	int ret;
+
+	struct stat dirList;
+	if ( (stat(dirName, &dirList)) == -1 ){
+		ret = -1;
+		send(cliFD, (void *)&ret, sizeof(int), 0);
+		return;
+	}
+	
+	else if (    (ret = rmdir(dirName)) == -1  ) {
+		ret = -2;
+		send(cliFD, (void *)&ret, sizeof(int), 0);
+		return;
+	}
+	else {
+		ret = 1;
+		send(cliFD, (void *)&ret, sizeof(int), 0);
+	}
+
+	recv(cliFD, (void *)&ret, sizeof(int), 0);
+	if ( ret == -1 ) {
+		mkdir(dirName, 0777);
+	}
+	
+	send(cliFD, (void *)&ret, sizeof(int), 0);
+}
+
+void makeDir(int cliFD, char * dirName){
+
+	int ret; 
+
+	struct stat dirList;
+	if ( (stat(dirName, &dirList)) != -1 ){
+		ret = -2;
+		send(cliFD, (void *)&ret, sizeof(int), 0);
+		return;
+	}
+
+	ret = mkdir(dirName, 0777);
+	send(cliFD, (void *)&ret, sizeof(int), 0);
+
+}
+
+void changeDir(int cliFD, char * dirName){
+
+	int ret; 
+
+	struct stat dirList;
+	if ( (stat(dirName, &dirList)) == -1 ){
+		ret = -2;
+		send(cliFD, (void *)&ret, sizeof(int), 0);
+		return;
+	}
+
+	ret = chdir(dirName);
+	send(cliFD, (void *)&ret, sizeof(int), 0);
+
+
+
+}
 
 void listing(int cliFD) {
 
-    char list[BUFSIZ][BUFSIZ];
-	FILE * out = popen("ls -l", "r");
+	FILE * fList = popen("ls -l", "r");
 	char buffer[BUFSIZ];
-
-	int size = 0;
-	while( !feof(out) ) {
-		if ( fgets(buffer, sizeof(buffer), out) != NULL) {
-			strcpy(list[size], buffer);
-			size++;
-		}
+	if(!fList){
+		std::cout << "Error on Popen" << std::endl;
+		std::exit(1);
+		return;
 	}
+	fread(buffer, 1, BUFSIZ, fList);
+	int bufSiz = strlen(buffer)+1;
+	sendToCli((void *)&bufSiz, sizeof(int), cliFD);
+	sendToCli(buffer, bufSiz, cliFD);
+	pclose(fList);
 
-	size--;  // Since first entry is not a file
 
-	sendToCli( (void *)&size , sizeof(size), cliFD);
 }
 
 // TODO
